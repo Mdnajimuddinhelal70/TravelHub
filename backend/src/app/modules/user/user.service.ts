@@ -63,7 +63,7 @@ const updateUser = async (
     }
   }
 
-  if (payload.isActive || payload.isDeleted || payload.isVerified) {
+  if (payload.isActive || payload.isDeleted) {
     if (decodedToken.role === Role.USER || decodedToken.role === Role.GUIDE) {
       throw new AppError(httpStatus.FORBIDDEN, "You are not authorized");
     }

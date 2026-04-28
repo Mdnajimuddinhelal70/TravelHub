@@ -5,13 +5,13 @@ import { Role } from "./user.interface";
 
 import { checkAuth } from "../../middlewares/checkAuth";
 import { validateRequest } from "../../middlewares/validateRequest";
-import { updateUserZodSchema } from "./user.validation";
+import { createUserZodSchema, updateUserZodSchema } from "./user.validation";
 
 const router = Router();
 
 router.post(
   "/register",
-  // validateRequest(createUserZodSchema),
+  validateRequest(createUserZodSchema),
   UserControllers.createUser,
 );
 router.get(

@@ -21,29 +21,21 @@ passport.use(
       try {
         const isUserExist = await User.findOne({ email });
 
-        // if (!isUserExist) {
-        //     return done(null, false, { message: "User does not exist" })
-        // }
-
         if (!isUserExist) {
-          return done("User does not exist");
-        }
-
-        if (!isUserExist.isVerified) {
-          // throw new AppError(httpStatus.BAD_REQUEST, "User is not verified")
-          return done("User is not verified");
+          return done(null, false, { message: "User does not exist" });
         }
 
         if (
           isUserExist.isActive === IsActive.BLOCKED ||
           isUserExist.isActive === IsActive.INACTIVE
         ) {
-          // throw new AppError(httpStatus.BAD_REQUEST, `User is ${isUserExist.isActive}`)
-          return done(`User is ${isUserExist.isActive}`);
+          return done(null, false, {
+            message: `User is ${isUserExist.isActive}`,
+          });
         }
+
         if (isUserExist.isDeleted) {
-          // throw new AppError(httpStatus.BAD_REQUEST, "User is deleted")
-          return done("User is deleted");
+          return done(null, false, { message: "User is deleted" });
         }
 
         const isGoogleAuthenticated = isUserExist.auths.some(
@@ -92,28 +84,22 @@ passport.use(
         const email = profile.emails?.[0].value;
 
         if (!email) {
-          return done(null, false, { mesaage: "No email found" });
+          return done(null, false, { message: "No email found" });
         }
 
         let isUserExist = await User.findOne({ email });
-        if (isUserExist && !isUserExist.isVerified) {
-          // throw new AppError(httpStatus.BAD_REQUEST, "User is not verified")
-          // done("User is not verified")
-          return done(null, false, { message: "User is not verified" });
-        }
-
         if (
           isUserExist &&
           (isUserExist.isActive === IsActive.BLOCKED ||
             isUserExist.isActive === IsActive.INACTIVE)
         ) {
-          // throw new AppError(httpStatus.BAD_REQUEST, `User is ${isUserExist.isActive}`)
-          done(`User is ${isUserExist.isActive}`);
+          return done(null, false, {
+            message: `User is ${isUserExist.isActive}`,
+          });
         }
 
         if (isUserExist && isUserExist.isDeleted) {
           return done(null, false, { message: "User is deleted" });
-          // done("User is deleted")
         }
 
         if (!isUserExist) {
@@ -122,7 +108,6 @@ passport.use(
             name: profile.displayName,
             picture: profile.photos?.[0].value,
             role: Role.USER,
-            isVerified: true,
             auths: [
               {
                 provider: "google",
