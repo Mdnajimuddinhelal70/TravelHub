@@ -34,8 +34,12 @@ export default function PublicNavbar() {
 
         {/* Actions */}
         <div className="hidden md:flex space-x-4">
-          <Button variant="outline">Login</Button>
-          <Button>Register</Button>
+          <Button variant="outline">
+            <Link href={"/login"}>Login</Link>
+          </Button>
+          <Button>
+            <Link href={"/register"}>Register</Link>
+          </Button>
         </div>
 
         {/* Mobile Menu Button */}
@@ -59,10 +63,14 @@ export default function PublicNavbar() {
           <Link href="/contact" className="block">
             Contact
           </Link>
+
           <Button variant="outline" className="w-full">
-            Login
+            <Link href={"/login"}>Login</Link>
           </Button>
-          <Button className="w-full">Register</Button>
+
+          <Button className="w-full">
+            <Link href={"/register"}>Register</Link>
+          </Button>
         </div>
       )}
     </nav>
