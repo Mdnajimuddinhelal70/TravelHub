@@ -1,140 +1,112 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import {
   getDefaultDashboardRoute,
+  isUserRole,
   isValidRedirectForRole,
   UserRole,
 } from "@/lib/auth-utils";
-
-import { parse } from "cookie";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import { serverFetch } from "@/lib/server-fetch";
+import { setCookie } from "@/services/auth/tokenHandlers";
 import { redirect } from "next/navigation";
 
-import { serverFetch } from "@/lib/server-fetch";
-import { setCookie } from "@/lib/tokenHandlers";
-import { zodValidator } from "@/lib/zodValidator";
-import { loginValidationZodSchema } from "@/zod/auth.validation";
+interface LoginResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    accessToken?: string;
+    refreshToken?: string;
+    user?: {
+      role?: unknown;
+    };
+  };
+}
 
-export const loginUser = async (
-  _currentState: any,
-  formData: any,
-): Promise<any> => {
+export const loginUser = async (_currentState: unknown, formData: FormData) => {
   try {
-    const redirectTo = formData.get("redirect") || null;
-    let accessTokenObject: null | any = null;
-    let refreshTokenObject: null | any = null;
-    const payload = {
-      email: formData.get("email"),
-      password: formData.get("password"),
+    const loginData = {
+      email: String(formData.get("email") ?? "")
+        .trim()
+        .toLowerCase(),
+      password: String(formData.get("password") ?? ""),
     };
 
-    if (zodValidator(payload, loginValidationZodSchema).success === false) {
-      return zodValidator(payload, loginValidationZodSchema);
+    if (!loginData.email || !loginData.password) {
+      return {
+        success: false,
+        message: "Email and password are required.",
+      };
     }
 
-    const validatedPayload = zodValidator(
-      payload,
-      loginValidationZodSchema,
-    ).data;
-
     const res = await serverFetch.post("/auth/login", {
-      body: JSON.stringify(validatedPayload),
+      body: JSON.stringify(loginData),
       headers: {
         "Content-Type": "application/json",
       },
     });
 
-    const result = await res.json();
+    const result = (await res.json()) as LoginResponse;
 
-    const setCookieHeaders = res.headers.getSetCookie();
-
-    if (setCookieHeaders && setCookieHeaders.length > 0) {
-      setCookieHeaders.forEach((cookie: string) => {
-        const parsedCookie = parse(cookie);
-
-        if (parsedCookie["accessToken"]) {
-          accessTokenObject = parsedCookie;
-        }
-        if (parsedCookie["refreshToken"]) {
-          refreshTokenObject = parsedCookie;
-        }
-      });
-    } else {
-      throw new Error("No Set-Cookie header found");
+    if (!res.ok || !result.success || !result.data?.accessToken) {
+      return {
+        success: false,
+        message: result.message || "Login failed. Please try again.",
+      };
     }
 
-    if (!accessTokenObject) {
-      throw new Error("Tokens not found in cookies");
+    const { accessToken, refreshToken, user } = result.data;
+    const role = user?.role;
+
+    // Never assume USER when the backend role is missing or invalid.
+    if (!isUserRole(role)) {
+      console.error("Login response contains an invalid user role.");
+
+      return {
+        success: false,
+        message: "Unable to verify your account role. Please contact support.",
+      };
     }
 
-    if (!refreshTokenObject) {
-      throw new Error("Tokens not found in cookies");
-    }
-
-    await setCookie("accessToken", accessTokenObject.accessToken, {
-      secure: true,
+    const cookieOptions = {
       httpOnly: true,
-      maxAge: parseInt(accessTokenObject["Max-Age"]) || 1000 * 60 * 60,
-      path: accessTokenObject.Path || "/",
-      sameSite: accessTokenObject["SameSite"] || "none",
-    });
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+    };
 
-    await setCookie("refreshToken", refreshTokenObject.refreshToken, {
-      secure: true,
-      httpOnly: true,
-      maxAge:
-        parseInt(refreshTokenObject["Max-Age"]) || 1000 * 60 * 60 * 24 * 90,
-      path: refreshTokenObject.Path || "/",
-      sameSite: refreshTokenObject["SameSite"] || "none",
-    });
-    const verifiedToken: JwtPayload | string = jwt.verify(
-      accessTokenObject.accessToken,
-      process.env.JWT_SECRET as string,
-    );
+    await setCookie("accessToken", accessToken, cookieOptions);
 
-    if (typeof verifiedToken === "string") {
-      throw new Error("Invalid token");
+    if (refreshToken) {
+      await setCookie("refreshToken", refreshToken, cookieOptions);
     }
 
-    const userRole: UserRole = verifiedToken.role;
+    const requestedRedirect = String(formData.get("redirect") ?? "");
 
-    if (!result.success) {
-      throw new Error(result.message || "Login failed");
-    }
+    const safeRedirect =
+      requestedRedirect && isValidRedirectForRole(requestedRedirect, role)
+        ? requestedRedirect
+        : "";
 
-    if (redirectTo && result.data.needPasswordChange) {
-      const requestedPath = redirectTo.toString();
-      if (isValidRedirectForRole(requestedPath, userRole)) {
-        redirect(`/reset-password?redirect=${requestedPath}`);
-      } else {
-        redirect("/reset-password");
-      }
-    }
+    const destination =
+      safeRedirect || getDefaultDashboardRoute(role as UserRole);
 
-    if (result.data.needPasswordChange) {
-      redirect("/reset-password");
-    }
-
-    if (redirectTo) {
-      const requestedPath = redirectTo.toString();
-      if (isValidRedirectForRole(requestedPath, userRole)) {
-        redirect(`${requestedPath}?loggedIn=true`);
-      } else {
-        redirect(`${getDefaultDashboardRoute(userRole)}?loggedIn=true`);
-      }
-    } else {
-      redirect(`${getDefaultDashboardRoute(userRole)}?loggedIn=true`);
-    }
-  } catch (error: any) {
-    // Re-throw NEXT_REDIRECT errors so Next.js can handle them
-    if (error?.digest?.startsWith("NEXT_REDIRECT")) {
+    redirect(destination);
+  } catch (error: unknown) {
+    // Next.js redirect() throws a special control-flow error.
+    if (
+      error instanceof Error &&
+      "digest" in error &&
+      typeof error.digest === "string" &&
+      error.digest.startsWith("NEXT_REDIRECT")
+    ) {
       throw error;
     }
-    console.log(error);
+
+    console.error("Login action failed:", error);
+
     return {
       success: false,
-      message: `${process.env.NODE_ENV === "development" ? error.message : "Login Failed. You might have entered incorrect email or password."}`,
+      message: "Login failed. Please check your credentials and try again.",
     };
   }
 };

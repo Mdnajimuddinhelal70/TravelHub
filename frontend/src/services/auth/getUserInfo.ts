@@ -2,45 +2,31 @@
 "use server";
 
 import { serverFetch } from "@/lib/server-fetch";
-
-import { getCookie } from "@/lib/tokenHandlers";
 import { UserInfo } from "@/types/user.interface";
-import jwt, { JwtPayload } from "jsonwebtoken";
 
-export const getUserInfo = async (): Promise<UserInfo | any> => {
+export const getUserInfo = async (): Promise<UserInfo> => {
   try {
-    // API call to backend
-    const response = await serverFetch.get("/auth/me", {
+    // const response = await serverFetch.get("/user/me", {
+    //   next: { tags: ["user-info"], revalidate: 180 },
+    // });
+    const response = await serverFetch.get("/user/me", {
+      credentials: "include",
       next: { tags: ["user-info"], revalidate: 180 },
     });
+
     const result = await response.json();
+    console.log("User info response:", result);
 
-    // Check if success
-    if (!result.success) {
-      throw new Error("Failed to fetch user info");
+    if (!response.ok || !result.success || !result.data) {
+      throw new Error(result.message || "Failed to fetch user info");
     }
 
-    // Get access token from cookies
-    const accessToken = await getCookie("accessToken");
-    if (!accessToken) {
-      throw new Error("No access token found");
-    }
-
-    // Verify token
-    const verifiedToken = jwt.verify(
-      accessToken,
-      process.env.JWT_SECRET as string,
-    ) as JwtPayload;
-
-    // Build user info object
-    const userInfo: UserInfo = {
-      id: result.data?.id || verifiedToken.userId || "",
-      name: result.data?.name || verifiedToken.name || "Unknown User",
-      email: result.data?.email || verifiedToken.email || "",
-      role: result.data?.role || verifiedToken.role || "USER", // default USER
+    return {
+      id: result.data.id ?? "",
+      name: result.data.name ?? "Unknown User",
+      email: result.data.email ?? "",
+      role: result.data.role ?? "USER",
     };
-
-    return userInfo;
   } catch (error: any) {
     console.error("Error fetching user info:", error);
     return {

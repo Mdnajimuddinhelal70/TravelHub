@@ -5,6 +5,15 @@ export type RouteConfig = {
   patterns: RegExp[];
 };
 
+export const isUserRole = (role: unknown): role is UserRole => {
+  return (
+    role === "SUPER_ADMIN" ||
+    role === "ADMIN" ||
+    role === "USER" ||
+    role === "GUIDE"
+  );
+};
+
 export const authRoutes = ["/login", "/register", "/forgot-password"];
 
 export const commonProtectedRoutes: RouteConfig = {
@@ -13,27 +22,27 @@ export const commonProtectedRoutes: RouteConfig = {
 };
 
 export const superAdminProtectedRoutes: RouteConfig = {
-  patterns: [/^\/super-admin/], // Routes starting with /super-admin/*
   exact: [],
+  patterns: [/^\/super-admin(?:\/|$)/],
 };
 
 export const adminProtectedRoutes: RouteConfig = {
-  patterns: [/^\/admin/], // Routes starting with /admin/*
   exact: [],
+  patterns: [/^\/admin(?:\/|$)/],
 };
 
 export const userProtectedRoutes: RouteConfig = {
-  patterns: [/^\/dashboard/], // Routes starting with /dashboard/*
   exact: [],
+  patterns: [/^\/dashboard(?:\/|$)/],
 };
 
 export const guideProtectedRoutes: RouteConfig = {
-  patterns: [/^\/guide/], // Routes starting with /guide/*
   exact: [],
+  patterns: [/^\/guide(?:\/|$)/],
 };
 
-export const isAuthRoute = (pathname: string) => {
-  return authRoutes.some((route: string) => route === pathname);
+export const isAuthRoute = (pathname: string): boolean => {
+  return authRoutes.includes(pathname);
 };
 
 export const isRouteMatches = (
@@ -43,59 +52,75 @@ export const isRouteMatches = (
   if (routes.exact.includes(pathname)) {
     return true;
   }
-  return routes.patterns.some((pattern: RegExp) => pattern.test(pathname));
+
+  return routes.patterns.some((pattern) => pattern.test(pathname));
 };
 
-export const getRouteOwner = (
-  pathname: string,
-): "SUPER_ADMIN" | "ADMIN" | "USER" | "GUIDE" | "COMMON" | null => {
+export const getRouteOwner = (pathname: string): UserRole | "COMMON" | null => {
   if (isRouteMatches(pathname, superAdminProtectedRoutes)) {
     return "SUPER_ADMIN";
   }
+
   if (isRouteMatches(pathname, adminProtectedRoutes)) {
     return "ADMIN";
   }
+
   if (isRouteMatches(pathname, userProtectedRoutes)) {
     return "USER";
   }
+
   if (isRouteMatches(pathname, guideProtectedRoutes)) {
     return "GUIDE";
   }
+
   if (isRouteMatches(pathname, commonProtectedRoutes)) {
     return "COMMON";
   }
+
   return null;
 };
 
 export const getDefaultDashboardRoute = (role: UserRole): string => {
-  if (role === "SUPER_ADMIN") {
-    return "/super-admin/dashboard";
-  }
-  if (role === "ADMIN") {
-    return "/admin/dashboard";
-  }
-  if (role === "USER") {
-    return "/dashboard";
-  }
-  if (role === "GUIDE") {
-    return "/guide/dashboard";
-  }
-  return "/";
+  const dashboardRoutes: Record<UserRole, string> = {
+    SUPER_ADMIN: "/super-admin/dashboard",
+    ADMIN: "/admin/dashboard",
+    USER: "/dashboard",
+    GUIDE: "/guide/dashboard",
+  };
+
+  return dashboardRoutes[role];
 };
 
 export const isValidRedirectForRole = (
   redirectPath: string,
   role: UserRole,
 ): boolean => {
+  // Allow only safe, local paths.
+  if (
+    !redirectPath.startsWith("/") ||
+    redirectPath.startsWith("//") ||
+    redirectPath.includes("\\")
+  ) {
+    return false;
+  }
+
+  // Allow the public homepage.
+  if (redirectPath === "/") {
+    return true;
+  }
+
   const routeOwner = getRouteOwner(redirectPath);
 
-  if (routeOwner === null || routeOwner === "COMMON") {
+  // Unknown paths and authentication pages are not accepted.
+  if (routeOwner === null) {
+    return false;
+  }
+
+  // Common protected routes are available to authenticated roles.
+  if (routeOwner === "COMMON") {
     return true;
   }
 
-  if (routeOwner === role) {
-    return true;
-  }
-
-  return false;
+  // Role-specific paths are allowed only for their owner.
+  return routeOwner === role;
 };

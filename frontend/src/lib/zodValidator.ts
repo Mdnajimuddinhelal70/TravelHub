@@ -1,22 +1,17 @@
-import { ZodObject } from "zod";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const zodValidator = (data: any, schema: any) => {
+  const result = schema.safeParse(data);
 
-export const zodValidator = <T>(payload: T, schema: ZodObject) => {
-  const validatedPayload = schema.safeParse(payload);
-
-  if (!validatedPayload.success) {
+  if (!result.success) {
     return {
       success: false,
-      errors: validatedPayload.error.issues.map((issue) => {
-        return {
-          field: issue.path[0],
-          message: issue.message,
-        };
-      }),
+      message: "Validation failed",
+      errors: result.error.flatten().fieldErrors,
     };
   }
 
   return {
     success: true,
-    data: validatedPayload.data,
+    data: result.data,
   };
 };

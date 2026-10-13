@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { NavSection } from "@/types/dashboard.interface";
 import { UserInfo } from "@/types/user.interface";
 
+import LogoutButton from "@/components/shared/LogoutButton";
 import { ScrollArea } from "@radix-ui/react-scroll-area";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -82,7 +83,7 @@ const DashboardSidebarContent = ({
       </ScrollArea>
 
       {/* User Info at Bottom */}
-      <div className="border-t p-4">
+      <div className="border-t p-4 space-y-4">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
             <span className="text-sm font-semibold text-primary">
@@ -96,6 +97,7 @@ const DashboardSidebarContent = ({
             </p>
           </div>
         </div>
+        <LogoutButton />
       </div>
     </div>
   );

@@ -7,32 +7,80 @@ import { QueryBuilder } from "../../utils/QueryBuilder";
 import { userSearchableFields } from "./user.constant";
 import { IAuthProvider, IUser, Role } from "./user.interface";
 import { User } from "./user.model";
+import { CreateUserInput } from "./user.validation";
 
-const createUser = async (payload: Partial<IUser>) => {
-  const { email, password, ...rest } = payload;
+const createUser = async (payload: CreateUserInput) => {
+  const email = payload.email.trim().toLowerCase();
 
-  const isUserExist = await User.findOne({ email });
+  const isUserExist = await User.findOne({ email }).select("+password");
+
   if (isUserExist) {
-    throw new AppError(httpStatus.BAD_REQUEST, "User Already Exist");
+    throw new AppError(
+      httpStatus.CONFLICT,
+      "An account with this email already exists.",
+    );
   }
-  const hashedPassword = await bcryptjs.hash(
-    password as string,
-    Number(envVars.BCRYPT_SALT_ROUND),
-  );
+
+  const saltRounds = Number(envVars.BCRYPT_SALT_ROUND);
+
+  if (!Number.isInteger(saltRounds) || saltRounds < 1) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Password hashing configuration is invalid.",
+    );
+  }
+
+  const hashedPassword = await bcryptjs.hash(payload.password, saltRounds);
+
   const authProvider: IAuthProvider = {
     provider: "credentials",
-    providerId: email as string,
+    providerId: email,
   };
 
-  const user = await User.create({
-    email,
-    password: hashedPassword,
-    auths: [authProvider],
-    ...rest,
-  });
+  try {
+    const user = await User.create({
+      name: payload.name.trim(),
+      email,
+      password: hashedPassword,
+      phone: payload.phone,
+      address: payload.address,
 
-  return user;
+      // Public registration must never choose its own role.
+      role: Role.USER,
+
+      auths: [authProvider],
+    });
+
+    // Explicitly return only safe fields.
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      picture: user.picture,
+      address: user.address,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
+  } catch (error: unknown) {
+    // MongoDB duplicate-key error.
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === 11000
+    ) {
+      throw new AppError(
+        httpStatus.CONFLICT,
+        "An account with this email already exists.",
+      );
+    }
+
+    throw error;
+  }
 };
+
 const updateUser = async (
   userId: string,
   payload: Partial<IUser>,
@@ -101,8 +149,18 @@ const getSingleUser = async (id: string) => {
     data: user,
   };
 };
+// const getMe = async (userId: string) => {
+//   const user = await User.findById(userId).select("-password");
+//   return {
+//     data: user,
+//   };
+// };
+
 const getMe = async (userId: string) => {
   const user = await User.findById(userId).select("-password");
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User Not Found");
+  }
   return {
     data: user,
   };

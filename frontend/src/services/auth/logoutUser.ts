@@ -1,7 +1,7 @@
 "use server";
 
-import { deleteCookie } from "@/lib/tokenHandlers";
 import { redirect } from "next/navigation";
+import { deleteCookie } from "./tokenHandlers";
 
 export const logoutUser = async () => {
   await deleteCookie("accessToken");

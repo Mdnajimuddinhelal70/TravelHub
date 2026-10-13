@@ -1,21 +1,18 @@
-import { FieldDescription } from "../ui/field";
-import { getInputFieldError, IInputErrorState } from "./getInputFieldError";
+import { IInputErrorState } from "./getInputFieldError";
 
 interface InputFieldErrorProps {
   field: string;
-  state: IInputErrorState;
+  state: IInputErrorState | null;
 }
 
 const InputFieldError = ({ field, state }: InputFieldErrorProps) => {
-  if (getInputFieldError(field, state)) {
-    return (
-      <FieldDescription className="text-red-600">
-        {getInputFieldError(field, state)}
-      </FieldDescription>
-    );
-  }
+  if (!state) return null;
 
-  return null;
+  const errorMessage = state.errors?.[field]?.[0];
+
+  if (!errorMessage) return null;
+
+  return <p className="text-sm text-red-500">{errorMessage}</p>;
 };
 
 export default InputFieldError;

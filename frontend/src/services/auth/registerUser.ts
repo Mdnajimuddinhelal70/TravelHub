@@ -3,47 +3,42 @@
 
 import { serverFetch } from "@/lib/server-fetch";
 import { zodValidator } from "@/lib/zodValidator";
-
-import { registerUserValidationZodSchema } from "@/zod/auth.validation";
+import { registerUserSchema } from "@/zod/auth.validation";
 import { loginUser } from "./loginUser";
 
-export const registerUser = async (
-  _currentState: any,
-  formData: any,
-): Promise<any> => {
+export const registerUser = async (_currentState: any, formData: FormData) => {
   try {
-    const payload = {
+    const rawData = {
       name: formData.get("name"),
+      phone: formData.get("phone"),
       address: formData.get("address"),
       email: formData.get("email"),
       password: formData.get("password"),
-      confirmPassword: formData.get("confirmPassword"),
     };
+    const validationResult = zodValidator(rawData, registerUserSchema);
 
-    const validationResult = zodValidator(
-      payload,
-      registerUserValidationZodSchema,
-    );
-    if (!validationResult.success) {
+    if (!validationResult.success || !validationResult.data) {
       return validationResult;
     }
 
-    const validatedPayload: any = validationResult.data;
+    const validatedPayload = validationResult.data;
 
-    const registerData = {
-      name: validatedPayload.name,
-      address: validatedPayload.address,
-      email: validatedPayload.email,
-      password: validatedPayload.password,
-    };
-
-    const newFormData = new FormData();
-    newFormData.append("data", JSON.stringify(registerData));
-
-    const res = await serverFetch.post("/user/create-user", {
-      body: newFormData,
+    // API CALL (CLEAN JSON)
+    const response = await serverFetch.post("/user/register", {
+      body: JSON.stringify(validatedPayload),
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
-    const result = await res.json();
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      return {
+        success: false,
+        message: result.message || "Registration failed",
+      };
+    }
 
     if (result.success) {
       await loginUser(_currentState, formData);
@@ -54,7 +49,7 @@ export const registerUser = async (
     if (error?.digest?.startsWith("NEXT_REDIRECT")) {
       throw error;
     }
-    console.log(error);
+
     return {
       success: false,
       message:

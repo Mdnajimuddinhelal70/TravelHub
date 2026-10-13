@@ -1,5 +1,6 @@
 "use client";
 import { loginUser } from "@/services/auth/loginUser";
+import Link from "next/link";
 import { useActionState, useEffect } from "react";
 import { toast } from "sonner";
 import InputFieldError from "./shared/InputFieldError";
@@ -29,7 +30,7 @@ const LoginForm = ({ redirect }: { redirect?: string }) => {
               name="email"
               type="email"
               placeholder="m@example.com"
-              //   required
+              required
             />
 
             <InputFieldError field="email" state={state} />
@@ -43,7 +44,7 @@ const LoginForm = ({ redirect }: { redirect?: string }) => {
               name="password"
               type="password"
               placeholder="Enter your password"
-              //   required
+              required
             />
             <InputFieldError field="password" state={state} />
           </Field>
@@ -56,17 +57,17 @@ const LoginForm = ({ redirect }: { redirect?: string }) => {
 
             <FieldDescription className="px-6 text-center">
               Don&apos;t have an account?{" "}
-              <a href="/register" className="text-blue-600 hover:underline">
+              <Link href="/register" className="text-blue-600 hover:underline">
                 Sign up
-              </a>
+              </Link>
             </FieldDescription>
             <FieldDescription className="px-6 text-center">
-              <a
+              <Link
                 href="/forgot-password"
                 className="text-blue-600 hover:underline"
               >
                 Forgot password?
-              </a>
+              </Link>
             </FieldDescription>
           </Field>
         </FieldGroup>

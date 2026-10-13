@@ -1,74 +1,84 @@
 import jwt, { JwtPayload } from "jsonwebtoken";
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   getDefaultDashboardRoute,
   getRouteOwner,
   isAuthRoute,
+  isUserRole,
   UserRole,
 } from "./lib/auth-utils";
-import { deleteCookie, getCookie } from "./lib/tokenHandlers";
 
 export async function proxy(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
-
-  const accessToken = (await getCookie("accessToken")) || null;
+  const { pathname } = request.nextUrl;
+  const accessToken = request.cookies.get("accessToken")?.value ?? null;
 
   let userRole: UserRole | null = null;
+  let invalidToken = false;
+
   if (accessToken) {
-    const verifiedToken: JwtPayload | string = jwt.verify(
-      accessToken,
-      process.env.JWT_SECRET as string,
-    );
+    try {
+      const secret = process.env.JWT_ACCESS_SECRET;
 
-    if (typeof verifiedToken === "string") {
-      await deleteCookie("accessToken");
-      await deleteCookie("refreshToken");
-      return NextResponse.redirect(new URL("/login", request.url));
+      if (!secret) {
+        throw new Error("JWT_ACCESS_SECRET is not configured.");
+      }
+
+      const decoded = jwt.verify(accessToken, secret) as JwtPayload;
+
+      if (!isUserRole(decoded.role)) {
+        invalidToken = true;
+      } else {
+        userRole = decoded.role;
+      }
+    } catch {
+      invalidToken = true;
     }
-
-    userRole = verifiedToken.role;
   }
 
-  const routerOwner = getRouteOwner(pathname);
+  const clearInvalidCookies = (response: NextResponse) => {
+    if (invalidToken) {
+      response.cookies.delete("accessToken");
+      response.cookies.delete("refreshToken");
+    }
+
+    return response;
+  };
+
+  const routeOwner = getRouteOwner(pathname);
   const isAuth = isAuthRoute(pathname);
 
-  // Rule 1 : Logged in user trying to access auth route → redirect to dashboard
-  if (accessToken && isAuth) {
-    return NextResponse.redirect(
-      new URL(getDefaultDashboardRoute(userRole as UserRole), request.url),
+  // Authenticated users should not return to login/register pages.
+  if (userRole && isAuth) {
+    return clearInvalidCookies(
+      NextResponse.redirect(
+        new URL(getDefaultDashboardRoute(userRole), request.url),
+      ),
     );
   }
 
-  // Rule 2 : Public route → allow
-  if (routerOwner === null) {
-    return NextResponse.next();
+  // Public routes remain accessible, even if an old token is invalid.
+  if (routeOwner === null) {
+    return clearInvalidCookies(NextResponse.next());
   }
 
-  // Rule 3 : No token → redirect to login
-  if (!accessToken) {
+  // Protected routes require a valid token with a recognized role.
+  if (!userRole) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+
+    return clearInvalidCookies(NextResponse.redirect(loginUrl));
   }
 
-  // Rule 4 : Common protected routes → allow
-  if (routerOwner === "COMMON") {
+  // Common protected routes are available to every authenticated role.
+  if (routeOwner === "COMMON") {
     return NextResponse.next();
   }
 
-  // Rule 5 : Role-based protected routes
-  if (
-    routerOwner === "SUPER_ADMIN" ||
-    routerOwner === "ADMIN" ||
-    routerOwner === "USER" ||
-    routerOwner === "GUIDE"
-  ) {
-    if (userRole !== routerOwner) {
-      return NextResponse.redirect(
-        new URL(getDefaultDashboardRoute(userRole as UserRole), request.url),
-      );
-    }
+  // Users can access only the routes assigned to their role.
+  if (routeOwner !== userRole) {
+    return NextResponse.redirect(
+      new URL(getDefaultDashboardRoute(userRole), request.url),
+    );
   }
 
   return NextResponse.next();
