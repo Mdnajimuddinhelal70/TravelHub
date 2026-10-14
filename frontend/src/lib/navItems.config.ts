@@ -1,78 +1,45 @@
 import { NavSection } from "@/types/dashboard.interface";
 import { getDefaultDashboardRoute, UserRole } from "./auth-utils";
 
-// Common Nav Items
-export const getCommonNavItems = (role: UserRole): NavSection[] => {
-  const defaultDashboard = getDefaultDashboardRoute(role);
-
-  return [
-    {
-      items: [
-        {
-          title: "Home",
-          href: "/",
-          icon: "Home",
-          roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
-        },
-        {
-          title: "Dashboard",
-          href: defaultDashboard,
-          icon: "LayoutDashboard",
-          roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
-        },
-        {
-          title: "My Profile",
-          href: "/my-profile",
-          icon: "User",
-          roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      items: [
-        {
-          title: "Change Password",
-          href: "/change-password",
-          icon: "Settings",
-          roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
-        },
-      ],
-    },
-  ];
-};
-
-// Guide/Doctor Nav Items
-export const guideNavItems: NavSection[] = [
+export const getCommonNavItems = (role: UserRole): NavSection[] => [
   {
-    title: "Guide Dashboard",
     items: [
       {
-        title: "Tours",
-        href: "/guide/dashboard/tours",
-        icon: "Map",
-        roles: ["GUIDE"],
+        title: "Visit Website",
+        href: "/",
+        icon: "Home",
+        roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
       },
       {
-        title: "Schedules",
-        href: "/guide/dashboard/schedules",
-        icon: "Clock",
-        roles: ["GUIDE"],
+        title: "Dashboard",
+        href: getDefaultDashboardRoute(role),
+        icon: "LayoutDashboard",
+        roles: [role],
       },
       {
-        title: "Earnings",
-        href: "/guide/dashboard/earnings",
-        icon: "DollarSign",
-        roles: ["GUIDE"],
+        title: "My Profile",
+        href: "/my-profile",
+        icon: "User",
+        roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
+      },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      {
+        title: "Change Password",
+        href: "/change-password",
+        icon: "Settings",
+        roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
       },
     ],
   },
 ];
 
-// Patient/User Nav Items
 export const userNavItems: NavSection[] = [
   {
-    title: "Bookings",
+    title: "My Travel",
     items: [
       {
         title: "My Bookings",
@@ -81,86 +48,122 @@ export const userNavItems: NavSection[] = [
         roles: ["USER"],
       },
       {
-        title: "New Booking",
-        href: "/dashboard/book-trip",
-        icon: "ClipboardList",
+        title: "Payment History",
+        href: "/dashboard/payment-history",
+        icon: "CreditCard",
         roles: ["USER"],
       },
-    ],
-  },
-  {
-    title: "Records",
-    items: [
       {
-        title: "My Reviews",
-        href: "/dashboard/my-reviews",
-        icon: "Star",
+        title: "My Profile",
+        href: "/dashboard/my-profile",
+        icon: "User",
+        roles: ["USER"],
+      },
+      {
+        title: "Settings",
+        href: "/dashboard/settings",
+        icon: "Settings",
+        roles: ["USER"],
+      },
+      {
+        title: "Support",
+        href: "/dashboard/support",
+        icon: "MessageCircle",
         roles: ["USER"],
       },
     ],
   },
 ];
 
-// Admin Nav Items
 export const adminNavItems: NavSection[] = [
   {
-    title: "User Management",
+    title: "Management",
     items: [
       {
-        title: "Admins",
-        href: "/admin/dashboard/admins-management",
-        icon: "Shield",
-        roles: ["ADMIN"],
-      },
-      {
-        title: "Guides",
-        href: "/admin/dashboard/guides-management",
-        icon: "Stethoscope",
-        roles: ["ADMIN"],
-      },
-      {
         title: "Users",
-        href: "/admin/dashboard/users-management",
+        href: "/admin/dashboard/user-management",
         icon: "Users",
         roles: ["ADMIN"],
       },
-    ],
-  },
-  {
-    title: "System Management",
-    items: [
       {
-        title: "Trips",
-        href: "/admin/dashboard/trips-management",
+        title: "Tours",
+        href: "/admin/dashboard/tour-management",
         icon: "Map",
         roles: ["ADMIN"],
       },
       {
-        title: "Payments",
-        href: "/admin/dashboard/payments-management",
-        icon: "CreditCard",
+        title: "Bookings",
+        href: "/admin/dashboard/booking-management",
+        icon: "Calendar",
+        roles: ["ADMIN"],
+      },
+      {
+        title: "Divisions",
+        href: "/admin/dashboard/add-division",
+        icon: "MapPin",
+        roles: ["ADMIN"],
+      },
+      {
+        title: "Admin Management",
+        href: "/admin/dashboard/admin-management",
+        icon: "Shield",
         roles: ["ADMIN"],
       },
     ],
   },
 ];
 
-// Role-based Nav Items
+export const superAdminNavItems: NavSection[] = [
+  {
+    title: "Administration",
+    items: [
+      {
+        title: "Admin Management",
+        href: "/admin/dashboard/admin-management",
+        icon: "Shield",
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "User Management",
+        href: "/admin/dashboard/user-management",
+        icon: "Users",
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Tour Management",
+        href: "/admin/dashboard/tour-management",
+        icon: "Map",
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Booking Management",
+        href: "/admin/dashboard/booking-management",
+        icon: "Calendar",
+        roles: ["SUPER_ADMIN"],
+      },
+    ],
+  },
+];
+
 export const getNavItemsByRole = async (
   role: UserRole,
 ): Promise<NavSection[]> => {
-  const commonNavItems = getCommonNavItems(role);
+  const commonItems = getCommonNavItems(role);
 
   switch (role) {
     case "SUPER_ADMIN":
-      return [...commonNavItems, ...adminNavItems];
+      return [...commonItems, ...superAdminNavItems];
+
     case "ADMIN":
-      return [...commonNavItems, ...adminNavItems];
-    case "GUIDE":
-      return [...commonNavItems, ...guideNavItems];
+      return [...commonItems, ...adminNavItems];
+
     case "USER":
-      return [...commonNavItems, ...userNavItems];
+      return [...commonItems, ...userNavItems];
+
+    case "GUIDE":
+      return commonItems;
+
     default:
-      return commonNavItems;
+      return commonItems;
   }
 };

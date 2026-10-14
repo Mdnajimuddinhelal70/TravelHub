@@ -14,10 +14,11 @@ export const isUserRole = (role: unknown): role is UserRole => {
   );
 };
 
-export const authRoutes = ["/login", "/register", "/forgot-password"];
+// Public authentication routes
+export const authRoutes = ["/login", "/register", "/reset-password"];
 
 export const commonProtectedRoutes: RouteConfig = {
-  exact: ["/my-profile", "/settings", "/change-password", "/reset-password"],
+  exact: ["/my-profile", "/settings", "/change-password"],
   patterns: [],
 };
 
@@ -109,18 +110,25 @@ export const isValidRedirectForRole = (
     return true;
   }
 
+  // Authentication pages are not valid post-login destinations.
+  if (isAuthRoute(redirectPath)) {
+    return false;
+  }
+
   const routeOwner = getRouteOwner(redirectPath);
 
-  // Unknown paths and authentication pages are not accepted.
   if (routeOwner === null) {
     return false;
   }
 
-  // Common protected routes are available to authenticated roles.
   if (routeOwner === "COMMON") {
     return true;
   }
 
-  // Role-specific paths are allowed only for their owner.
+  // Super Admin can also access Admin management routes.
+  if (role === "SUPER_ADMIN" && routeOwner === "ADMIN") {
+    return true;
+  }
+
   return routeOwner === role;
 };

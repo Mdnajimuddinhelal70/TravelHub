@@ -1,7 +1,8 @@
 "use client";
 import { loginUser } from "@/services/auth/loginUser";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import InputFieldError from "./shared/InputFieldError";
 import { Button } from "./ui/button";
@@ -10,6 +11,7 @@ import { Input } from "./ui/input";
 
 const LoginForm = ({ redirect }: { redirect?: string }) => {
   const [state, formAction, isPending] = useActionState(loginUser, null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (state && !state.success && state.message) {
@@ -39,13 +41,28 @@ const LoginForm = ({ redirect }: { redirect?: string }) => {
           {/* Password */}
           <Field>
             <FieldLabel htmlFor="password">Password</FieldLabel>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="Enter your password"
-              required
-            />
+
+            <div className="relative">
+              <Input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                required
+                className="pr-10"
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword((previous) => !previous)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
             <InputFieldError field="password" state={state} />
           </Field>
         </div>

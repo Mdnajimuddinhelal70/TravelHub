@@ -75,7 +75,10 @@ export async function proxy(request: NextRequest) {
   }
 
   // Users can access only the routes assigned to their role.
-  if (routeOwner !== userRole) {
+  const isSuperAdminAccessingAdminRoute =
+    userRole === "SUPER_ADMIN" && routeOwner === "ADMIN";
+
+  if (routeOwner !== userRole && !isSuperAdminAccessingAdminRoute) {
     return NextResponse.redirect(
       new URL(getDefaultDashboardRoute(userRole), request.url),
     );

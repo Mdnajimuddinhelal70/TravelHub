@@ -1,9 +1,13 @@
-import DashboardSidebar from "@/components/modules/Dashboard/DashboardSidebar";
-
 const UserDashboardPage = () => {
   return (
     <div>
-      <DashboardSidebar />
+      <h1 className="text-2xl font-bold tracking-tight">
+        Welcome to Your Dashboard
+      </h1>
+
+      <p className="mt-2 text-muted-foreground">
+        Manage your bookings and explore your travel activities.
+      </p>
     </div>
   );
 };
