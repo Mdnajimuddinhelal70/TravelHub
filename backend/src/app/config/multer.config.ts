@@ -1,38 +1,41 @@
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary-v2";
 import { cloudinaryUpload } from "./cloudinary.config";
 
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinaryUpload,
+  // The adapter's TypeScript definition is incompatible with
+  // Cloudinary SDK v2's uploader callback types.
+  cloudinary: cloudinaryUpload as unknown as ConstructorParameters<
+    typeof CloudinaryStorage
+  >[0]["cloudinary"],
+
   params: {
-    public_id: (req, file) => {
-      // My Special.Image#!@.png => 4545adsfsadf-45324263452-my-image.png
-      // My Special.Image#!@.png => [My Special, Image#!@, png]
+    public_id: (_req, file) => {
+      // Example: My Special.Image#!@.png
+      // Result: unique-id-timestamp-my-special-image-png
 
-      const fileName = file.originalname
-        .toLowerCase()
-        .replace(/\s+/g, "-") // empty space remove replace with dash
-        .replace(/\./g, "-")
-        // eslint-disable-next-line no-useless-escape
-        .replace(/[^a-z0-9\-\.]/g, ""); // non alpha numeric - !@#$
+      const originalName = file.originalname.toLowerCase();
 
-      const extension = file.originalname.split(".").pop();
+      const fileName = originalName
+        .replace(/\.[^.]+$/, "")
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
 
-      // binary -> 0,1 hexa decimal -> 0-9 A-F base 36 -> 0-9 a-z
-      // 0.2312345121 -> "0.hedfa674338sasfamx" ->
-      //452384772534
-      const uniqueFileName =
-        Math.random().toString(36).substring(2) +
-        "-" +
-        Date.now() +
-        "-" +
-        fileName +
-        "." +
-        extension;
+      const extension = file.originalname.split(".").pop()?.toLowerCase();
 
-      return uniqueFileName;
+      const uniqueId = Math.random().toString(36).substring(2);
+
+      const uniqueFileName = [uniqueId, Date.now(), fileName || "upload"].join(
+        "-",
+      );
+
+      return extension ? `${uniqueFileName}.${extension}` : uniqueFileName;
     },
   },
 });
 
-export const multerUpload = multer({ storage: storage });
+export const multerUpload = multer({
+  storage,
+});
