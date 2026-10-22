@@ -25,7 +25,7 @@ passport_1.default.use(new passport_local_1.Strategy({
     passwordField: "password",
 }, (email, password, done) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const isUserExist = yield user_model_1.User.findOne({ email });
+        const isUserExist = yield user_model_1.User.findOne({ email }).select("+password");
         if (!isUserExist) {
             return done(null, false, { message: "User does not exist" });
         }

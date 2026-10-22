@@ -19,32 +19,48 @@ const AppError_1 = __importDefault(require("../errorHelpers/AppError"));
 const user_interface_1 = require("../modules/user/user.interface");
 const user_model_1 = require("../modules/user/user.model");
 const jwt_1 = require("../utils/jwt");
+const isValidRole = (role) => {
+    return Object.values(user_interface_1.Role).some((validRole) => validRole === role);
+};
 const checkAuth = (...authRoles) => (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const accessToken = req.headers.authorization;
+        const authorization = req.headers.authorization;
+        const accessToken = authorization === null || authorization === void 0 ? void 0 : authorization.replace(/^Bearer\s+/i, "").trim();
         if (!accessToken) {
-            throw new AppError_1.default(403, "No Token Recieved");
+            throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Access token is required.");
         }
-        const verifiedToken = (0, jwt_1.verifyToken)(accessToken, env_1.envVars.JWT_ACCESS_SECRET);
-        const isUserExist = yield user_model_1.User.findOne({ email: verifiedToken.email });
-        if (!isUserExist) {
-            throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "User does not exist");
+        let decoded;
+        try {
+            decoded = (0, jwt_1.verifyToken)(accessToken, env_1.envVars.JWT_ACCESS_SECRET);
         }
-        if (isUserExist.isActive === user_interface_1.IsActive.BLOCKED ||
-            isUserExist.isActive === user_interface_1.IsActive.INACTIVE) {
-            throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, `User is ${isUserExist.isActive}`);
+        catch (_a) {
+            throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Invalid or expired access token.");
         }
-        if (isUserExist.isDeleted) {
-            throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "User is deleted");
+        if (typeof decoded !== "object" ||
+            decoded === null ||
+            typeof decoded.email !== "string" ||
+            !isValidRole(decoded.role)) {
+            throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Invalid access token payload.");
         }
-        if (!authRoles.includes(verifiedToken.role)) {
-            throw new AppError_1.default(403, "You are not permitted to view this route!!!");
+        const user = yield user_model_1.User.findOne({ email: decoded.email });
+        if (!user) {
+            throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "User does not exist.");
         }
-        req.user = verifiedToken;
+        if (user.isDeleted) {
+            throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, "This account is deleted.");
+        }
+        if (user.isActive === user_interface_1.IsActive.BLOCKED ||
+            user.isActive === user_interface_1.IsActive.INACTIVE) {
+            throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, `User is ${user.isActive}.`);
+        }
+        // Always authorize using the current database role.
+        if (!authRoles.includes(user.role)) {
+            throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, "You are not permitted to access this resource.");
+        }
+        req.user = Object.assign(Object.assign({}, decoded), { userId: user._id.toString(), email: user.email, role: user.role });
         next();
     }
     catch (error) {
-        console.log("jwt error", error);
         next(error);
     }
 });

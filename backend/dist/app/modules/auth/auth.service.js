@@ -43,16 +43,7 @@ const credentialsLogin = (payload) => __awaiter(void 0, void 0, void 0, function
     if (!isPasswordMatched) {
         throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "Incorrect Password");
     }
-    // const jwtPayload = {
-    //     userId: isUserExist._id,
-    //     email: isUserExist.email,
-    //     role: isUserExist.role
-    // }
-    // const accessToken = generateToken(jwtPayload, envVars.JWT_ACCESS_SECRET, envVars.JWT_ACCESS_EXPIRES)
-    // const refreshToken = generateToken(jwtPayload, envVars.JWT_REFRESH_SECRET, envVars.JWT_REFRESH_EXPIRES)
     const userTokens = (0, userTokens_1.createUserTokens)(isUserExist);
-    // delete isUserExist.password;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _a = isUserExist.toObject(), { password: pass } = _a, rest = __rest(_a, ["password"]);
     return {
         accessToken: userTokens.accessToken,

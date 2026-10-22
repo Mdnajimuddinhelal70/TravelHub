@@ -23,8 +23,8 @@ const user_interface_1 = require("./user.interface");
 const user_model_1 = require("./user.model");
 const createUser = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     const email = payload.email.trim().toLowerCase();
-    const existingUser = yield user_model_1.User.findOne({ email });
-    if (existingUser) {
+    const isUserExist = yield user_model_1.User.findOne({ email }).select("+password");
+    if (isUserExist) {
         throw new AppError_1.default(http_status_codes_1.default.CONFLICT, "An account with this email already exists.");
     }
     const saltRounds = Number(env_1.envVars.BCRYPT_SALT_ROUND);
