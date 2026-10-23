@@ -50,6 +50,7 @@ const initPayment = (bookingId) => __awaiter(void 0, void 0, void 0, function* (
 const successPayment = (query) => __awaiter(void 0, void 0, void 0, function* () {
     // Update Booking Status to COnfirm
     // Update Payment Status to PAID
+    var _a, _b, _c;
     const session = yield booking_model_1.Booking.startSession();
     session.startTransaction();
     try {
@@ -59,8 +60,14 @@ const successPayment = (query) => __awaiter(void 0, void 0, void 0, function* ()
         if (!updatedPayment) {
             throw new AppError_1.default(401, "Payment not found");
         }
-        const updatedBooking = yield booking_model_1.Booking.findByIdAndUpdate(updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.booking, { status: booking_interface_1.BOOKING_STATUS.COMPLETE }, { new: true, runValidators: true, session })
-            .populate("tour", "title")
+        const updatedBooking = yield booking_model_1.Booking.findByIdAndUpdate(updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.booking, { status: booking_interface_1.BOOKING_STATUS.COMPLETED }, { new: true, runValidators: true, session })
+            .populate({
+            path: "tourDeparture",
+            populate: {
+                path: "tour",
+                select: "title slug",
+            },
+        })
             .populate("user", "name email");
         if (!updatedBooking) {
             throw new AppError_1.default(401, "Booking not found");
@@ -69,7 +76,7 @@ const successPayment = (query) => __awaiter(void 0, void 0, void 0, function* ()
             bookingDate: updatedBooking.createdAt,
             guestCount: updatedBooking.guestCount,
             totalAmount: updatedPayment.amount,
-            tourTitle: updatedBooking.tour.title,
+            tourTitle: (_c = (_b = (_a = updatedBooking === null || updatedBooking === void 0 ? void 0 : updatedBooking.tourDeparture) === null || _a === void 0 ? void 0 : _a.tour) === null || _b === void 0 ? void 0 : _b.title) !== null && _c !== void 0 ? _c : "Tour",
             transactionId: updatedPayment.transactionId,
             userName: updatedBooking.user.name,
         };
@@ -133,7 +140,7 @@ const cancelPayment = (query) => __awaiter(void 0, void 0, void 0, function* () 
         const updatedPayment = yield payment_model_1.Payment.findOneAndUpdate({ transactionId: query.transactionId }, {
             status: payment_interface_1.PAYMENT_STATUS.CANCELLED,
         }, { runValidators: true, session: session });
-        yield booking_model_1.Booking.findByIdAndUpdate(updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.booking, { status: booking_interface_1.BOOKING_STATUS.CANCEL }, { runValidators: true, session });
+        yield booking_model_1.Booking.findByIdAndUpdate(updatedPayment === null || updatedPayment === void 0 ? void 0 : updatedPayment.booking, { status: booking_interface_1.BOOKING_STATUS.COMPLETED }, { runValidators: true, session });
         yield session.commitTransaction(); //transaction
         session.endSession();
         return { success: false, message: "Payment Cancelled" };

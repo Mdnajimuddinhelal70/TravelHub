@@ -3,13 +3,31 @@ import { IDivision } from "./division.interface";
 
 const divisionSchema = new Schema<IDivision>(
   {
-    name: { type: String, required: true, unique: true },
-    slug: { type: String, unique: true },
-    thumbnail: { type: String },
-    description: { type: String },
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    thumbnail: {
+      type: String,
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,
+    versionKey: false,
   },
 );
 

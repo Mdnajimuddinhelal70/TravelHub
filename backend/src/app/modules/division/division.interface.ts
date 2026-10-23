@@ -4,3 +4,15 @@ export interface IDivision {
   thumbnail?: string;
   description?: string;
 }
+
+export interface ICreateDivisionInput {
+  name: string;
+  thumbnail?: string;
+  description?: string;
+}
+
+export interface IUpdateDivisionInput {
+  name?: string;
+  thumbnail?: string;
+  description?: string;
+}

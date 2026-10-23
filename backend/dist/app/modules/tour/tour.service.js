@@ -8,6 +8,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TourService = void 0;
 const cloudinary_config_1 = require("../../config/cloudinary.config");
@@ -15,12 +26,13 @@ const QueryBuilder_1 = require("../../utils/QueryBuilder");
 const tour_constant_1 = require("./tour.constant");
 const tour_model_1 = require("./tour.model");
 const createTour = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    const existingTour = yield tour_model_1.Tour.findOne({ title: payload.title });
+    const existingTour = yield tour_model_1.Tour.findOne({
+        $or: [{ title: payload.title }, { slug: payload.slug }],
+    });
     if (existingTour) {
-        throw new Error("A tour with this title already exists.");
+        throw new Error("A tour with this title or slug already exists.");
     }
-    const tour = yield tour_model_1.Tour.create(payload);
-    return tour;
+    return yield tour_model_1.Tour.create(payload);
 });
 const getAllTours = (query) => __awaiter(void 0, void 0, void 0, function* () {
     const queryBuilder = new QueryBuilder_1.QueryBuilder(tour_model_1.Tour.find(), query);
@@ -46,32 +58,26 @@ const getSingleTour = (slug) => __awaiter(void 0, void 0, void 0, function* () {
     };
 });
 const updateTour = (id, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const existingTour = yield tour_model_1.Tour.findById(id);
     if (!existingTour) {
         throw new Error("Tour not found.");
     }
-    if (payload.images &&
-        payload.images.length > 0 &&
-        existingTour.images &&
-        existingTour.images.length > 0) {
-        payload.images = [...payload.images, ...existingTour.images];
+    const { deleteImages = [], images: newImages } = payload, updateData = __rest(payload, ["deleteImages", "images"]);
+    // Use an explicitly typed update object so images can be assigned safely.
+    const finalUpdateData = Object.assign({}, updateData);
+    if (newImages !== undefined || deleteImages.length > 0) {
+        const deletedImages = new Set(deleteImages);
+        const remainingImages = ((_a = existingTour.images) !== null && _a !== void 0 ? _a : []).filter((imageUrl) => !deletedImages.has(imageUrl));
+        const uploadedImages = (newImages !== null && newImages !== void 0 ? newImages : []).filter((imageUrl) => !deletedImages.has(imageUrl));
+        finalUpdateData.images = [...remainingImages, ...uploadedImages];
     }
-    if (payload.deleteImages &&
-        payload.deleteImages.length > 0 &&
-        existingTour.images &&
-        existingTour.images.length > 0) {
-        const restDBImages = existingTour.images.filter((imageUrl) => { var _a; return !((_a = payload.deleteImages) === null || _a === void 0 ? void 0 : _a.includes(imageUrl)); });
-        const updatedPayloadImages = (payload.images || [])
-            .filter((imageUrl) => { var _a; return !((_a = payload.deleteImages) === null || _a === void 0 ? void 0 : _a.includes(imageUrl)); })
-            .filter((imageUrl) => !restDBImages.includes(imageUrl));
-        payload.images = [...restDBImages, ...updatedPayloadImages];
-    }
-    const updatedTour = yield tour_model_1.Tour.findByIdAndUpdate(id, payload, { new: true });
-    if (payload.deleteImages &&
-        payload.deleteImages.length > 0 &&
-        existingTour.images &&
-        existingTour.images.length > 0) {
-        yield Promise.all(payload.deleteImages.map((url) => (0, cloudinary_config_1.deleteImageFromCLoudinary)(url)));
+    const updatedTour = yield tour_model_1.Tour.findByIdAndUpdate(id, finalUpdateData, {
+        new: true,
+        runValidators: true,
+    });
+    if (deleteImages.length > 0) {
+        yield Promise.all(deleteImages.map((url) => (0, cloudinary_config_1.deleteImageFromCLoudinary)(url)));
     }
     return updatedTour;
 });
@@ -79,11 +85,13 @@ const deleteTour = (id) => __awaiter(void 0, void 0, void 0, function* () {
     return yield tour_model_1.Tour.findByIdAndDelete(id);
 });
 const createTourType = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    const existingTourType = yield tour_model_1.TourType.findOne({ name: payload.name });
+    const existingTourType = yield tour_model_1.TourType.findOne({
+        $or: [{ name: payload.name }, { slug: payload.slug }],
+    });
     if (existingTourType) {
-        throw new Error("Tour type already exists.");
+        throw new Error("A tour type with this name or slug already exists.");
     }
-    return yield tour_model_1.TourType.create({ name: payload.name });
+    return yield tour_model_1.TourType.create(payload);
 });
 const getAllTourTypes = (query) => __awaiter(void 0, void 0, void 0, function* () {
     const queryBuilder = new QueryBuilder_1.QueryBuilder(tour_model_1.TourType.find(), query);
@@ -113,10 +121,13 @@ const updateTourType = (id, payload) => __awaiter(void 0, void 0, void 0, functi
     if (!existingTourType) {
         throw new Error("Tour type not found.");
     }
-    const updatedTourType = yield tour_model_1.TourType.findByIdAndUpdate(id, payload, {
+    if (Object.keys(payload).length === 0) {
+        return existingTourType;
+    }
+    return yield tour_model_1.TourType.findByIdAndUpdate(id, payload, {
         new: true,
+        runValidators: true,
     });
-    return updatedTourType;
 });
 const deleteTourType = (id) => __awaiter(void 0, void 0, void 0, function* () {
     const existingTourType = yield tour_model_1.TourType.findById(id);

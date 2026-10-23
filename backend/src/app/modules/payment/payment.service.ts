@@ -9,7 +9,6 @@ import { BOOKING_STATUS } from "../booking/booking.interface";
 import { Booking } from "../booking/booking.model";
 import { ISSLCommerz } from "../sslCommerz/sslCommerz.interface";
 import { SSLService } from "../sslCommerz/sslCommerz.service";
-import { ITour } from "../tour/tour.interface";
 import { IUser } from "../user/user.interface";
 import { PAYMENT_STATUS } from "./payment.interface";
 import { Payment } from "./payment.model";
@@ -68,10 +67,16 @@ const successPayment = async (query: Record<string, string>) => {
 
     const updatedBooking = await Booking.findByIdAndUpdate(
       updatedPayment?.booking,
-      { status: BOOKING_STATUS.COMPLETE },
+      { status: BOOKING_STATUS.COMPLETED },
       { new: true, runValidators: true, session },
     )
-      .populate("tour", "title")
+      .populate({
+        path: "tourDeparture",
+        populate: {
+          path: "tour",
+          select: "title slug",
+        },
+      })
       .populate("user", "name email");
 
     if (!updatedBooking) {
@@ -82,7 +87,7 @@ const successPayment = async (query: Record<string, string>) => {
       bookingDate: updatedBooking.createdAt as Date,
       guestCount: updatedBooking.guestCount,
       totalAmount: updatedPayment.amount,
-      tourTitle: (updatedBooking.tour as unknown as ITour).title,
+      tourTitle: (updatedBooking?.tourDeparture as any)?.tour?.title ?? "Tour",
       transactionId: updatedPayment.transactionId,
       userName: (updatedBooking.user as unknown as IUser).name,
     };
@@ -178,7 +183,7 @@ const cancelPayment = async (query: Record<string, string>) => {
 
     await Booking.findByIdAndUpdate(
       updatedPayment?.booking,
-      { status: BOOKING_STATUS.CANCEL },
+      { status: BOOKING_STATUS.COMPLETED },
       { runValidators: true, session },
     );
 
