@@ -1,12 +1,13 @@
-import TourSearchBar from "@/components/modules/ExploreTours/TourSearchBar/TourSearchBar";
+import AllToursSection from "@/components/modules/ExploreTours/AllToursSection/AllToursSection";
+import TourDiscoverySection from "@/components/modules/ExploreTours/TourDiscoverySection/TourDiscoverySection";
 import ToursHeroSection from "@/components/modules/ExploreTours/ToursHeroSection";
 
 const ToursPage = () => {
   return (
     <div>
       <ToursHeroSection />
-      <TourSearchBar />
-      {/* <TourCard /> */}
+      <TourDiscoverySection />
+      <AllToursSection />
     </div>
   );
 };
