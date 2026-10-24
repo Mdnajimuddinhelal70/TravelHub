@@ -1,23 +1,3 @@
-// /* eslint-disable @typescript-eslint/no-explicit-any */
-// import { Types } from "mongoose";
-
-// export enum PAYMENT_STATUS {
-//   PAID = "PAID",
-//   UNPAID = "UNPAID",
-//   CANCELLED = "CANCELLED",
-//   FAILED = "FAILED",
-//   REFUNDED = "REFUNDED",
-// }
-
-// export interface IPayment {
-//   booking: Types.ObjectId;
-//   transactionId: string;
-//   amount: number;
-//   paymentGatewayData?: any;
-//   invoiceUrl?: string;
-//   status: PAYMENT_STATUS;
-// }
-
 import { Types } from "mongoose";
 
 export enum PAYMENT_STATUS {
@@ -29,15 +9,29 @@ export enum PAYMENT_STATUS {
   REFUNDED = "REFUNDED",
 }
 
+export enum PAYMENT_GATEWAY {
+  SSLCOMMERZ = "sslcommerz",
+  BKASH = "bkash",
+  NAGAD = "nagad",
+  STRIPE = "stripe",
+  MANUAL = "manual",
+}
+
 export interface IPayment {
   booking: Types.ObjectId;
-  transactionId: string;
+  user: Types.ObjectId; // denormalized for quick lookup
+  gateway: PAYMENT_GATEWAY;
+  transactionId?: string; // optional initially, unique when set
   amount: number;
-  currency: string;
+  currency: string; // default 'BDT'
   status: PAYMENT_STATUS;
   paymentGatewayData?: Record<string, unknown>;
+  failureReason?: string;
   invoiceUrl?: string;
+  paidAt?: Date;
   verifiedAt?: Date;
+  refundedAt?: Date;
+  refundAmount?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
