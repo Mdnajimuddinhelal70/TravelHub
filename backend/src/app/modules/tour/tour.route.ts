@@ -7,6 +7,7 @@ import { TourController } from "./tour.controller";
 import {
   createTourTypeZodSchema,
   createTourZodSchema,
+  updateTourTypeZodSchema,
   updateTourZodSchema,
 } from "./tour.validation";
 
@@ -23,10 +24,11 @@ router.post(
 );
 
 router.get("/tour-types/:id", TourController.getSingleTourType);
+
 router.patch(
   "/tour-types/:id",
   checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
-  validateRequest(createTourTypeZodSchema),
+  validateRequest(updateTourTypeZodSchema), // ✅ update schema
   TourController.updateTourType,
 );
 
@@ -48,6 +50,7 @@ router.post(
 );
 
 router.get("/:slug", TourController.getSingleTour);
+
 router.patch(
   "/:id",
   checkAuth(Role.ADMIN, Role.SUPER_ADMIN),

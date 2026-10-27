@@ -1,5 +1,6 @@
 "use client";
 
+import type { ITour } from "@/types";
 import {
   ArrowDownUp,
   ArrowRight,
@@ -22,162 +23,50 @@ import { useMemo, useState } from "react";
 
 const categories = [
   "All Tours",
-  "Beach",
-  "Adventure",
-  "Nature",
-  "Cultural",
+  "group",
+  "family",
+  "honeymoon",
+  "adventure",
+  "corporate",
 ] as const;
 
-type TourCategory = (typeof categories)[number];
-
-type Tour = {
-  id: string;
-  slug: string;
-  title: string;
-  destination: string;
-  category: Exclude<TourCategory, "All Tours">;
-  image: string;
-  imageAlt: string;
-  duration: string;
-  groupSize: string;
-  price: number;
-  originalPrice: number;
-  rating: number;
-  reviews: number;
-  featured: boolean;
-  badge?: string;
-  description: string;
-};
-
-const demoTours: Tour[] = [
-  {
-    id: "tour-1",
-    slug: "bali-tropical-escape",
-    title: "Bali Tropical Escape",
-    destination: "Bali, Indonesia",
-    category: "Beach",
-    image:
-      "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Lush tropical landscape and traditional Balinese architecture",
-    duration: "5 Days / 4 Nights",
-    groupSize: "2–10 people",
-    price: 649,
-    originalPrice: 799,
-    rating: 4.9,
-    reviews: 128,
-    featured: true,
-    badge: "Bestseller",
-    description:
-      "Discover tropical beaches, hidden temples, and unforgettable island sunsets.",
-  },
-  {
-    id: "tour-2",
-    slug: "swiss-alpine-adventure",
-    title: "Swiss Alpine Adventure",
-    destination: "Interlaken, Switzerland",
-    category: "Adventure",
-    image:
-      "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Beautiful Swiss alpine scenery beneath a dramatic sky",
-    duration: "6 Days / 5 Nights",
-    groupSize: "2–8 people",
-    price: 1299,
-    originalPrice: 1499,
-    rating: 4.9,
-    reviews: 96,
-    featured: true,
-    badge: "Popular",
-    description:
-      "Explore breathtaking mountain scenery and unforgettable alpine experiences.",
-  },
-  {
-    id: "tour-3",
-    slug: "santorini-coastal-journey",
-    title: "Santorini Coastal Journey",
-    destination: "Santorini, Greece",
-    category: "Cultural",
-    image:
-      "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Whitewashed Santorini buildings overlooking the blue Aegean Sea",
-    duration: "4 Days / 3 Nights",
-    groupSize: "2–12 people",
-    price: 899,
-    originalPrice: 1099,
-    rating: 4.8,
-    reviews: 84,
-    featured: false,
-    description:
-      "Experience island architecture, charming streets, and coastal sunsets.",
-  },
-  {
-    id: "tour-4",
-    slug: "bali-rainforest-retreat",
-    title: "Rainforest Retreat",
-    destination: "Ubud, Bali",
-    category: "Nature",
-    image:
-      "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Peaceful green rainforest filled with lush trees",
-    duration: "3 Days / 2 Nights",
-    groupSize: "2–8 people",
-    price: 349,
-    originalPrice: 429,
-    rating: 4.8,
-    reviews: 72,
-    featured: false,
-    description:
-      "Reconnect with nature through peaceful landscapes and scenic forest trails.",
-  },
-  {
-    id: "tour-5",
-    slug: "thailand-island-discovery",
-    title: "Island Discovery",
-    destination: "Phi Phi Islands, Thailand",
-    category: "Beach",
-    image:
-      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Crystal-clear turquoise ocean along a tropical sandy beach",
-    duration: "4 Days / 3 Nights",
-    groupSize: "2–10 people",
-    price: 529,
-    originalPrice: 649,
-    rating: 4.7,
-    reviews: 63,
-    featured: false,
-    description:
-      "Discover turquoise lagoons, island views, and relaxing beach escapes.",
-  },
-  {
-    id: "tour-6",
-    slug: "himalayan-mountain-escape",
-    title: "Himalayan Escape",
-    destination: "Pokhara, Nepal",
-    category: "Adventure",
-    image:
-      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Towering mountain peaks and spectacular alpine scenery",
-    duration: "5 Days / 4 Nights",
-    groupSize: "2–8 people",
-    price: 749,
-    originalPrice: 899,
-    rating: 4.9,
-    reviews: 105,
-    featured: false,
-    description:
-      "Take in remarkable mountain landscapes and explore the great outdoors.",
-  },
-];
+type CategoryFilter = (typeof categories)[number];
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: "BDT",
     maximumFractionDigits: 0,
   }).format(price);
 
-const AllToursSection = () => {
+const getDestinationName = (tour: ITour): string => {
+  if (tour.primaryDestination && typeof tour.primaryDestination !== "string") {
+    return tour.primaryDestination.name;
+  }
+  if (Array.isArray(tour.destinations) && tour.destinations.length > 0) {
+    const first = tour.destinations[0];
+    return typeof first === "string" ? first : first.name;
+  }
+  return "Multiple destinations";
+};
+
+const getImage = (tour: ITour): string => {
+  if (tour.coverImage) return tour.coverImage;
+  if (Array.isArray(tour.images) && tour.images.length > 0)
+    return tour.images[0];
+  return "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85";
+};
+
+const getDiscountPrice = (tour: ITour): { final: number; original: number } => {
+  const original = tour.price?.adult ?? 0;
+  const percent = tour.price?.discountPercent ?? 0;
+  const final = Math.round(original - (original * percent) / 100);
+  return { final, original };
+};
+
+const AllToursSection = ({ tours }: { tours: ITour[] }) => {
   const [activeCategory, setActiveCategory] =
-    useState<TourCategory>("All Tours");
+    useState<CategoryFilter>("All Tours");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("featured");
   const [maxBudget, setMaxBudget] = useState("any");
@@ -186,18 +75,21 @@ const AllToursSection = () => {
   const filteredTours = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
-    const result = demoTours.filter((tour) => {
+    const result = tours.filter((tour) => {
       const matchesCategory =
         activeCategory === "All Tours" || tour.category === activeCategory;
 
+      const destination = getDestinationName(tour);
+
       const matchesSearch =
         !normalizedQuery ||
-        `${tour.title} ${tour.destination} ${tour.category}`
+        `${tour.title} ${destination} ${tour.category ?? ""}`
           .toLowerCase()
           .includes(normalizedQuery);
 
       const matchesBudget =
-        maxBudget === "any" || tour.price <= Number(maxBudget);
+        maxBudget === "any" ||
+        getDiscountPrice(tour).final <= Number(maxBudget);
 
       return matchesCategory && matchesSearch && matchesBudget;
     });
@@ -205,16 +97,16 @@ const AllToursSection = () => {
     return [...result].sort((a, b) => {
       switch (sortBy) {
         case "price-low":
-          return a.price - b.price;
+          return getDiscountPrice(a).final - getDiscountPrice(b).final;
         case "price-high":
-          return b.price - a.price;
+          return getDiscountPrice(b).final - getDiscountPrice(a).final;
         case "rating":
-          return b.rating - a.rating;
+          return (b.rating ?? 0) - (a.rating ?? 0);
         default:
-          return Number(b.featured) - Number(a.featured);
+          return (b.rating ?? 0) - (a.rating ?? 0);
       }
     });
-  }, [activeCategory, searchQuery, sortBy, maxBudget]);
+  }, [tours, activeCategory, searchQuery, sortBy, maxBudget]);
 
   const toggleFavorite = (id: string) => {
     setFavorites((current) =>
@@ -248,7 +140,6 @@ const AllToursSection = () => {
         aria-hidden="true"
         className="pointer-events-none absolute -left-48 top-40 -z-10 h-[400px] w-[400px] rounded-full bg-sky-100/60 blur-[110px]"
       />
-
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-48 top-[45%] -z-10 h-[440px] w-[440px] rounded-full bg-violet-100/50 blur-[120px]"
@@ -260,7 +151,6 @@ const AllToursSection = () => {
           <div className="max-w-3xl">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50/80 px-4 py-2">
               <Compass className="h-4 w-4 text-sky-600" />
-
               <span className="text-[11px] font-extrabold uppercase tracking-[0.17em] text-sky-800">
                 The TravelHub Collection
               </span>
@@ -286,7 +176,6 @@ const AllToursSection = () => {
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-sky-100 to-violet-100 text-sky-700">
               <MapPin className="h-5 w-5" />
             </div>
-
             <div>
               <p className="text-lg font-bold text-slate-900">
                 {filteredTours.length.toString().padStart(2, "0")}{" "}
@@ -294,7 +183,6 @@ const AllToursSection = () => {
                   journeys
                 </span>
               </p>
-
               <p className="text-xs text-slate-500">
                 Matching your preferences
               </p>
@@ -311,7 +199,6 @@ const AllToursSection = () => {
                 aria-hidden="true"
                 className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
               />
-
               <input
                 type="search"
                 value={searchQuery}
@@ -328,7 +215,6 @@ const AllToursSection = () => {
                 <label htmlFor="tour-collection-budget" className="sr-only">
                   Filter by maximum price
                 </label>
-
                 <select
                   id="tour-collection-budget"
                   value={maxBudget}
@@ -336,12 +222,11 @@ const AllToursSection = () => {
                   className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-9 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
                 >
                   <option value="any">Any budget</option>
-                  <option value="400">Up to $400</option>
-                  <option value="600">Up to $600</option>
-                  <option value="800">Up to $800</option>
-                  <option value="1000">Up to $1,000</option>
+                  <option value="5000">Up to ৳5,000</option>
+                  <option value="10000">Up to ৳10,000</option>
+                  <option value="20000">Up to ৳20,000</option>
+                  <option value="50000">Up to ৳50,000</option>
                 </select>
-
                 <SlidersHorizontal
                   aria-hidden="true"
                   className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -353,7 +238,6 @@ const AllToursSection = () => {
                 <label htmlFor="tour-collection-sort" className="sr-only">
                   Sort tours
                 </label>
-
                 <select
                   id="tour-collection-sort"
                   value={sortBy}
@@ -365,7 +249,6 @@ const AllToursSection = () => {
                   <option value="price-high">Price: High to low</option>
                   <option value="rating">Highest rated</option>
                 </select>
-
                 <ArrowDownUp
                   aria-hidden="true"
                   className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -380,28 +263,25 @@ const AllToursSection = () => {
               <SlidersHorizontal className="h-3.5 w-3.5" />
               Categories
             </span>
-
             {categories.map((category) => {
               const isActive = activeCategory === category;
-
               return (
                 <button
                   key={category}
                   type="button"
                   onClick={() => setActiveCategory(category)}
                   aria-pressed={isActive}
-                  className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 ${
+                  className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold capitalize transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 ${
                     isActive
                       ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/20"
                       : "border border-slate-200 bg-white text-slate-600 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
                   }`}
                 >
                   {isActive && <Check className="h-3.5 w-3.5" />}
-                  {category}
+                  {category === "All Tours" ? category : category}
                 </button>
               );
             })}
-
             {hasActiveFilters && (
               <button
                 type="button"
@@ -423,13 +303,11 @@ const AllToursSection = () => {
                 ? "Discover all tours"
                 : `${activeCategory} tours`}
             </h3>
-
             <p className="mt-1.5 text-sm text-slate-500">
               Showing {filteredTours.length}{" "}
               {filteredTours.length === 1 ? "experience" : "experiences"}
             </p>
           </div>
-
           <span className="hidden items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 sm:inline-flex">
             <Sparkles className="h-3.5 w-3.5" />
             Curated journeys
@@ -440,23 +318,24 @@ const AllToursSection = () => {
         {filteredTours.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 xl:gap-7">
             {filteredTours.map((tour) => {
-              const isFavorite = favorites.includes(tour.id);
+              const isFavorite = favorites.includes(tour._id);
+              const { final, original } = getDiscountPrice(tour);
+              const destination = getDestinationName(tour);
 
               return (
                 <article
-                  key={tour.id}
+                  key={tour._id}
                   className="group flex h-full flex-col overflow-hidden rounded-[26px] border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.035] transition-all duration-300 hover:-translate-y-1.5 hover:border-sky-100 hover:shadow-xl hover:shadow-slate-900/[0.08]"
                 >
                   {/* Tour image */}
                   <div className="relative h-[245px] overflow-hidden bg-slate-100 sm:h-[255px]">
                     <Image
-                      src={tour.image}
-                      alt={tour.imageAlt}
+                      src={getImage(tour)}
+                      alt={tour.title}
                       fill
                       sizes="(max-width: 639px) 100vw, (max-width: 1279px) 50vw, 33vw"
                       className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     />
-
                     <div
                       aria-hidden="true"
                       className="absolute inset-0 bg-gradient-to-t from-slate-950/35 via-transparent to-slate-950/10"
@@ -464,22 +343,17 @@ const AllToursSection = () => {
 
                     {/* Category badge */}
                     <div className="absolute left-4 top-4 flex flex-wrap gap-2">
-                      {tour.badge && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/95 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-800 shadow-sm backdrop-blur-xl">
-                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                          {tour.badge}
+                      {tour.category && (
+                        <span className="rounded-full border border-white/25 bg-slate-950/35 px-3 py-1.5 text-[10px] font-bold capitalize text-white backdrop-blur-xl">
+                          {tour.category}
                         </span>
                       )}
-
-                      <span className="rounded-full border border-white/25 bg-slate-950/35 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur-xl">
-                        {tour.category}
-                      </span>
                     </div>
 
                     {/* Favorite control */}
                     <button
                       type="button"
-                      onClick={() => toggleFavorite(tour.id)}
+                      onClick={() => toggleFavorite(tour._id)}
                       aria-label={
                         isFavorite
                           ? `Remove ${tour.title} from favorites`
@@ -498,9 +372,9 @@ const AllToursSection = () => {
                     {/* Rating */}
                     <div className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-slate-950/30 px-3 py-2 text-xs font-bold text-white backdrop-blur-xl">
                       <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                      {tour.rating.toFixed(1)}
+                      {(tour.rating ?? 0).toFixed(1)}
                       <span className="font-medium text-white/75">
-                        ({tour.reviews} reviews)
+                        ({tour.totalReviews ?? 0} reviews)
                       </span>
                     </div>
                   </div>
@@ -509,7 +383,7 @@ const AllToursSection = () => {
                   <div className="flex flex-1 flex-col p-5 sm:p-6">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-700">
                       <MapPin className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{tour.destination}</span>
+                      <span className="truncate">{destination}</span>
                     </div>
 
                     <h4 className="mt-3 text-xl font-bold tracking-tight text-slate-900 transition-colors group-hover:text-sky-700 sm:text-[22px]">
@@ -517,7 +391,7 @@ const AllToursSection = () => {
                     </h4>
 
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
-                      {tour.description}
+                      {tour.description ?? ""}
                     </p>
 
                     {/* Tour metadata */}
@@ -526,14 +400,13 @@ const AllToursSection = () => {
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
                           <Clock3 className="h-4 w-4" />
                         </span>
-
                         <div className="min-w-0">
                           <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
                             Duration
                           </p>
-
                           <p className="mt-1 truncate text-xs font-bold text-slate-700">
-                            {tour.duration}
+                            {tour.duration?.days ?? 0}D /{" "}
+                            {tour.duration?.nights ?? 0}N
                           </p>
                         </div>
                       </div>
@@ -542,14 +415,13 @@ const AllToursSection = () => {
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
                           <UsersRound className="h-4 w-4" />
                         </span>
-
                         <div className="min-w-0">
                           <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
                             Group size
                           </p>
-
                           <p className="mt-1 truncate text-xs font-bold text-slate-700">
-                            {tour.groupSize}
+                            {tour.minGroupSize ?? 1}–{tour.maxGuest ?? 20}{" "}
+                            people
                           </p>
                         </div>
                       </div>
@@ -561,19 +433,18 @@ const AllToursSection = () => {
                         <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
                           Starting from
                         </p>
-
                         <div className="mt-1 flex flex-wrap items-baseline gap-2">
                           <span className="text-2xl font-extrabold tracking-tight text-slate-950">
-                            {formatPrice(tour.price)}
+                            {formatPrice(final)}
                           </span>
-
-                          <span className="text-xs font-medium text-slate-400 line-through">
-                            {formatPrice(tour.originalPrice)}
-                          </span>
+                          {original > final && (
+                            <span className="text-xs font-medium text-slate-400 line-through">
+                              {formatPrice(original)}
+                            </span>
+                          )}
                         </div>
-
                         <p className="mt-1 text-[11px] text-slate-500">
-                          Per person · Demo pricing
+                          Per person
                         </p>
                       </div>
 
@@ -596,17 +467,14 @@ const AllToursSection = () => {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-100 to-violet-100 text-sky-700">
               <Search className="h-7 w-7" />
             </div>
-
             <h3 className="mt-5 text-xl font-bold text-slate-900">
               No journeys found
             </h3>
-
             <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-slate-500">
               We couldn&apos;t find any tours matching your current filters. Try
               another destination, choose a different category, or adjust your
               budget.
             </p>
-
             <button
               type="button"
               onClick={clearFilters}
@@ -624,19 +492,16 @@ const AllToursSection = () => {
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-sky-700 shadow-sm ring-1 ring-slate-100">
               <CalendarDays className="h-5 w-5" />
             </div>
-
             <div>
               <p className="font-bold text-slate-900">
                 Your next adventure starts here
               </p>
-
               <p className="mt-1 max-w-lg text-sm leading-6 text-slate-500">
                 Find an experience you love and explore the details of your next
                 unforgettable journey.
               </p>
             </div>
           </div>
-
           <Link
             href="#tour-discovery-heading"
             className="group inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-200 hover:text-sky-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
@@ -645,11 +510,6 @@ const AllToursSection = () => {
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
-
-        <p className="mt-5 text-center text-xs leading-5 text-slate-400">
-          Sample tour listings and prices are for UI demonstration only. Live
-          availability, ratings, and prices will come from the backend.
-        </p>
       </div>
     </section>
   );

@@ -61,7 +61,16 @@ export const updateUserZodSchema = z
         "Phone number must be +8801XXXXXXXXX or 01XXXXXXXXX.",
       )
       .optional(),
-
+    picture: z
+      .string()
+      .trim()
+      .url("Picture must be a valid URL")
+      .max(500)
+      .refine(
+        (url) => url.startsWith("https://res.cloudinary.com/"),
+        "Picture must be uploaded via our system",
+      )
+      .optional(),
     address: z
       .string()
       .trim()

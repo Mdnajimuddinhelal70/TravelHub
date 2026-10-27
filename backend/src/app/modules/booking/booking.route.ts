@@ -13,7 +13,7 @@ const router = express.Router();
 
 // api/v1/booking
 router.post(
-  "/",
+  "/create",
   checkAuth(...Object.values(Role)),
   validateRequest(createBookingZodSchema),
   BookingController.createBooking,

@@ -29,6 +29,7 @@ export interface IUser {
   isDeleted?: boolean;
   isActive?: IsActive;
   role: Role;
+  refreshToken?: string;
   auths: IAuthProvider[];
   bookings?: Types.ObjectId[];
   guides?: Types.ObjectId[];

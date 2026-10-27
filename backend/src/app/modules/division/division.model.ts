@@ -36,16 +36,19 @@ const divisionSchema = new Schema<IDivision>(
       type: {
         type: String,
         enum: ["Point"],
-        default: "Point",
       },
       coordinates: {
         type: [Number],
-        default: undefined,
       },
     },
     isActive: {
       type: Boolean,
       default: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
   },
   {
@@ -54,19 +57,9 @@ const divisionSchema = new Schema<IDivision>(
   },
 );
 
-/* ============================================================
- *  INDEXES
- * ============================================================ */
-
-// Geo query (near me, map)
 divisionSchema.index({ location: "2dsphere" });
-
-// Filter
 divisionSchema.index({ isActive: 1 });
 divisionSchema.index({ name: "text", description: "text" });
-
-/* ============================================================
- *  MODEL
- * ============================================================ */
+divisionSchema.index({ isDeleted: 1 });
 
 export const Division = model<IDivision>("Division", divisionSchema);

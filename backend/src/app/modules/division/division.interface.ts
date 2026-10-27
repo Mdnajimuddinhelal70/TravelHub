@@ -1,7 +1,3 @@
-/* ============================================================
- *  DIVISION
- * ============================================================ */
-
 export interface IDivision {
   name: string;
   slug: string;
@@ -11,6 +7,7 @@ export interface IDivision {
   districts?: string[];
   location?: { type: "Point"; coordinates: [number, number] };
   isActive: boolean;
+  isDeleted?: boolean;
 }
 
 export interface ICreateDivisionInput {
@@ -23,5 +20,4 @@ export interface ICreateDivisionInput {
   isActive?: boolean;
 }
 
-// Update-এ সব field optional
 export type IUpdateDivisionInput = Partial<ICreateDivisionInput>;

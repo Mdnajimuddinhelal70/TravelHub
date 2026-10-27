@@ -4,10 +4,6 @@ import {
   TOUR_DEPARTURE_STATUS,
 } from "./tour-departure.interface";
 
-/* ============================================================
- *  TOUR DEPARTURE SCHEMA
- * ============================================================ */
-
 const tourDepartureSchema = new Schema<ITourDeparture>(
   {
     tour: {
@@ -75,17 +71,9 @@ const tourDepartureSchema = new Schema<ITourDeparture>(
   },
 );
 
-/* ============================================================
- *  INDEXES
- * ============================================================ */
-
 tourDepartureSchema.index({ tour: 1, startDate: 1 }, { unique: true });
 tourDepartureSchema.index({ status: 1, startDate: 1 });
 tourDepartureSchema.index({ tour: 1, status: 1 });
-
-/* ============================================================
- *  HOOKS
- * ============================================================ */
 
 // endDate > startDate
 tourDepartureSchema.pre("validate", function () {
@@ -101,7 +89,6 @@ tourDepartureSchema.pre("validate", function () {
   }
 });
 
-// availableSeats 0 হলে FULL, ফিরে এলে OPEN
 tourDepartureSchema.pre("save", function () {
   if (
     this.isModified("availableSeats") &&
@@ -118,10 +105,6 @@ tourDepartureSchema.pre("save", function () {
     this.status = TOUR_DEPARTURE_STATUS.OPEN;
   }
 });
-
-/* ============================================================
- *  MODEL
- * ============================================================ */
 
 export const TourDeparture = model<ITourDeparture>(
   "TourDeparture",

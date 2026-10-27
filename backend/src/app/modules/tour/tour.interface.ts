@@ -1,8 +1,5 @@
 import { Types } from "mongoose";
 
-/* ============================================================
- *  TOUR
- * ============================================================ */
 export interface ITour {
   title: string;
   slug: string;
@@ -34,9 +31,10 @@ export interface ITour {
   maxGuest?: number;
   minAge?: number;
   cancellationPolicy?: string;
-  rating: number; // default 0, review থেকে আপডেট হবে
-  totalReviews: number; // default 0
-  status: "draft" | "published" | "archived"; // default 'draft'
+  rating: number;
+  totalReviews: number;
+  isDeleted?: boolean;
+  status: "draft" | "published" | "archived";
 }
 
 export interface ICreateTourInput {
@@ -44,7 +42,7 @@ export interface ICreateTourInput {
   description?: string;
   coverImage?: string;
   images?: string[];
-  destinations: string[]; // ObjectId string হিসেবে আসবে
+  destinations: string[];
   primaryDestination?: string;
   tourType: string;
   category?: ITour["category"];
@@ -67,16 +65,13 @@ export interface ICreateTourInput {
 
 export type IUpdateTourInput = Partial<ICreateTourInput>;
 
-/* ============================================================
- *  TOUR TYPE
- * ============================================================ */
-
 export interface ITourType {
   name: string;
   slug: string;
   description?: string;
   icon?: string;
-  isActive: boolean; // default true
+  isDeleted?: boolean;
+  isActive: boolean;
 }
 
 export interface ICreateTourTypeInput {

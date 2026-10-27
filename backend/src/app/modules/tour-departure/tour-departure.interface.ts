@@ -15,10 +15,10 @@ export interface ITourDeparture {
   pricePerPerson: number;
   totalSeats: number;
   availableSeats: number;
-  bookedSeats: number; // derive করা যায়, কিন্তু query-তে দরকার
-  minGroupSize?: number; // tour থেকে override
+  bookedSeats: number;
+  minGroupSize?: number;
   status: TOUR_DEPARTURE_STATUS;
-  guide?: Types.ObjectId; // ref to User (guide role)
+  guide?: Types.ObjectId;
   meetingPoint?: string;
   cancellationReason?: string;
   notes?: string;

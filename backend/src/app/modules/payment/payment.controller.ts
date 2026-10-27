@@ -25,6 +25,10 @@ const successPayment = catchAsync(async (req: Request, res: Response) => {
     res.redirect(
       `${envVars.SSL.SSL_SUCCESS_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
     );
+  } else {
+    res.redirect(
+      `${envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
+    );
   }
 });
 const failPayment = catchAsync(async (req: Request, res: Response) => {

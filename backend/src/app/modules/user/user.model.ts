@@ -78,11 +78,29 @@ const userSchema = new Schema<IUser>(
       default: IsActive.ACTIVE,
       required: true,
     },
+    refreshToken: {
+      type: String,
+      select: false,
+    },
 
     auths: {
       type: [authProviderSchema],
       default: [],
     },
+    bookings: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Booking",
+        default: [],
+      },
+    ],
+    guides: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Guide",
+        default: [],
+      },
+    ],
   },
   {
     timestamps: true,

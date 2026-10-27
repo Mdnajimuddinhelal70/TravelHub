@@ -1,0 +1,5976 @@
+
+===== ./package.json =====
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./dist/server.js",
+    "dev": "tsx watch ./src/server.ts",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/dotenv": "^6.1.1",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/express-session": "^1.19.0",
+    "@types/nodemailer": "^8.0.0",
+    "@types/passport": "^1.0.17",
+    "@types/passport-google-oauth20": "^2.0.17",
+    "@types/passport-local": "^1.0.38",
+    "@types/pdfkit": "^0.17.6",
+    "axios": "^1.15.2",
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.10.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "ejs": "^5.0.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "http-status-codes": "^2.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.5.0",
+    "multer": "^2.1.1",
+    "multer-storage-cloudinary-v2": "^1.0.3",
+    "nodemailer": "^10.1.1",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-local": "^1.0.0",
+    "pdfkit": "^0.18.0",
+    "zod": "^4.3.6"
+  }
+}
+
+===== ./src/app.ts =====
+import cookieParser from "cookie-parser";
+import cors from "cors";
+import express, { Request, Response } from "express";
+import expressSession from "express-session";
+import passport from "passport";
+import { envVars } from "./app/config/env";
+import "./app/config/passport";
+import { globalErrorHandler } from "./app/middlewares/globalErrorHandler";
+import notFound from "./app/middlewares/notFound";
+import { router } from "./app/router";
+
+const app = express();
+app.use(cookieParser());
+
+app.use(
+  expressSession({
+    secret: envVars.EXPRESS_SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+  }),
+);
+app.use(passport.initialize());
+app.use(passport.session());
+app.use(cookieParser());
+app.use(express.json());
+app.set("trust proxy", 1);
+app.use(express.urlencoded({ extended: true }));
+app.use(
+  cors({
+    origin: envVars.FRONTEND_URL,
+    credentials: true,
+  }),
+);
+
+app.use("/api/v1", router);
+
+app.get("/", (req: Request, res: Response) => {
+  res.status(200).json({
+    message: "Welcome to Tour Management System Backend",
+  });
+});
+
+app.use(globalErrorHandler);
+
+app.use(notFound);
+
+export default app;
+
+===== ./src/app/config/cloudinary.config.ts =====
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+// Frontedn -> Form Data with Image File -> Multer -> Form data -> Req (Body + File)
+
+import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
+import stream from "stream";
+import AppError from "../errorHelpers/AppError";
+import { envVars } from "./env";
+
+// Amader folder -> image -> form data -> File -> Multer -> Amader project / pc te Nijer ekta folder(temporary) -> Req.file
+
+//req.file -> cloudinary(req.file) -> url -> mongoose -> mongodb
+
+cloudinary.config({
+  cloud_name: envVars.CLOUDINARY.CLOUDINARY_CLOUD_NAME,
+  api_key: envVars.CLOUDINARY.CLOUDINARY_API_KEY,
+  api_secret: envVars.CLOUDINARY.CLOUDINARY_API_SECRET,
+});
+
+export const uploadBufferToCloudinary = async (
+  buffer: Buffer,
+  fileName: string,
+): Promise<UploadApiResponse | undefined> => {
+  try {
+    return new Promise((resolve, reject) => {
+      const public_id = `pdf/${fileName}-${Date.now()}`;
+
+      const bufferStream = new stream.PassThrough();
+      bufferStream.end(buffer);
+
+      cloudinary.uploader
+        .upload_stream(
+          {
+            resource_type: "auto",
+            public_id: public_id,
+            folder: "pdf",
+          },
+          (error, result) => {
+            if (error) {
+              return reject(error);
+            }
+            resolve(result);
+          },
+        )
+        .end(buffer);
+    });
+  } catch (error: any) {
+    console.log(error);
+    throw new AppError(401, `Error uploading file ${error.message}`);
+  }
+};
+
+export const deleteImageFromCLoudinary = async (url: string) => {
+  try {
+    //https://res.cloudinary.com/djzppynpk/image/upload/v1753126572/ay9roxiv8ue-1753126570086-download-2-jpg.jpg.jpg
+
+    const regex = /\/v\d+\/(.*?)\.(jpg|jpeg|png|gif|webp)$/i;
+
+    const match = url.match(regex);
+
+    console.log({ match });
+
+    if (match && match[1]) {
+      const public_id = match[1];
+      await cloudinary.uploader.destroy(public_id);
+      console.log(`File ${public_id} is deleted from cloudinary`);
+    }
+  } catch (error: any) {
+    throw new AppError(401, "Cloudinary image deletion failed", error.message);
+  }
+};
+
+export const cloudinaryUpload = cloudinary;
+
+// const uploadToCloudinary = cloudinary.uploader.upload()
+
+//
+
+//Multer storage cloudinary
+//Amader folder -> image -> form data -> File -> Multer -> storage in cloudinary -> url ->  req.file  -> url  -> mongoose -> mongodb
+
+===== ./src/app/config/env.ts =====
+import dotenv from "dotenv";
+
+dotenv.config();
+
+interface EnvConfig {
+  PORT: string;
+  DB_URL: string;
+  NODE_ENV: "development" | "production";
+  BCRYPT_SALT_ROUND: string;
+  JWT_ACCESS_SECRET: string;
+  JWT_ACCESS_EXPIRES: string;
+  JWT_REFRESH_SECRET: string;
+  JWT_REFRESH_EXPIRES: string;
+  SUPER_ADMIN_EMAIL: string;
+  SUPER_ADMIN_PASSWORD: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CALLBACK_URL: string;
+  EXPRESS_SESSION_SECRET: string;
+  FRONTEND_URL: string;
+  SSL: {
+    STORE_ID: string;
+    STORE_PASS: string;
+    SSL_PAYMENT_API: string;
+    SSL_VALIDATION_API: string;
+    SSL_SUCCESS_FRONTEND_URL: string;
+    SSL_FAIL_FRONTEND_URL: string;
+    SSL_CANCEL_FRONTEND_URL: string;
+    SSL_SUCCESS_BACKEND_URL: string;
+    SSL_FAIL_BACKEND_URL: string;
+    SSL_CANCEL_BACKEND_URL: string;
+    SSL_IPN_URL: string;
+  };
+  CLOUDINARY: {
+    CLOUDINARY_CLOUD_NAME: string;
+    CLOUDINARY_API_KEY: string;
+    CLOUDINARY_API_SECRET: string;
+  };
+  // EMAIL_SENDER: {
+  //   SMTP_USER: string;
+  //   SMTP_PASS: string;
+  //   SMTP_PORT: string;
+  //   SMTP_HOST: string;
+  //   SMTP_FROM: string;
+  // };
+  // REDIS_HOST: string;
+  // REDIS_PORT: string;
+  // REDIS_USERNAME: string;
+  // REDIS_PASSWORD: string;
+}
+
+const loadEnvVariables = (): EnvConfig => {
+  const requiredEnvVariables: string[] = [
+    "PORT",
+    "DB_URL",
+    "NODE_ENV",
+    "BCRYPT_SALT_ROUND",
+    "JWT_ACCESS_EXPIRES",
+    "JWT_ACCESS_SECRET",
+    "SUPER_ADMIN_EMAIL",
+    "SUPER_ADMIN_PASSWORD",
+    "JWT_REFRESH_SECRET",
+    "JWT_REFRESH_EXPIRES",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CALLBACK_URL",
+    "EXPRESS_SESSION_SECRET",
+    "FRONTEND_URL",
+    "SSL_STORE_ID",
+    "SSL_STORE_PASS",
+    "SSL_PAYMENT_API",
+    "SSL_VALIDATION_API",
+    "SSL_SUCCESS_FRONTEND_URL",
+    "SSL_FAIL_FRONTEND_URL",
+    "SSL_CANCEL_FRONTEND_URL",
+    "SSL_SUCCESS_BACKEND_URL",
+    "SSL_FAIL_BACKEND_URL",
+    "SSL_CANCEL_BACKEND_URL",
+    "CLOUDINARY_CLOUD_NAME",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET",
+    // "SMTP_PASS",
+    // "SMTP_PORT",
+    // "SMTP_HOST",
+    // "SMTP_USER",
+    // "SMTP_FROM",
+    // "REDIS_HOST",
+    // "REDIS_PORT",
+    // "REDIS_USERNAME",
+    // "REDIS_PASSWORD",
+    // "SSL_IPN_URL",
+  ];
+
+  requiredEnvVariables.forEach((key) => {
+    if (!process.env[key]) {
+      throw new Error(`Missing require environment variabl ${key}`);
+    }
+  });
+
+  return {
+    PORT: process.env.PORT as string,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    DB_URL: process.env.DB_URL!,
+    NODE_ENV: process.env.NODE_ENV as "development" | "production",
+    BCRYPT_SALT_ROUND: process.env.BCRYPT_SALT_ROUND as string,
+    JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET as string,
+    JWT_ACCESS_EXPIRES: process.env.JWT_ACCESS_EXPIRES as string,
+    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET as string,
+    JWT_REFRESH_EXPIRES: process.env.JWT_REFRESH_EXPIRES as string,
+    SUPER_ADMIN_EMAIL: process.env.SUPER_ADMIN_EMAIL as string,
+    SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD as string,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET as string,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID as string,
+    GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL as string,
+    EXPRESS_SESSION_SECRET: process.env.EXPRESS_SESSION_SECRET as string,
+    FRONTEND_URL: process.env.FRONTEND_URL as string,
+    // ssl
+    SSL: {
+      STORE_ID: process.env.SSL_STORE_ID as string,
+      STORE_PASS: process.env.SSL_STORE_PASS as string,
+      SSL_PAYMENT_API: process.env.SSL_PAYMENT_API as string,
+      SSL_VALIDATION_API: process.env.SSL_VALIDATION_API as string,
+      SSL_SUCCESS_FRONTEND_URL: process.env.SSL_SUCCESS_FRONTEND_URL as string,
+      SSL_FAIL_FRONTEND_URL: process.env.SSL_FAIL_FRONTEND_URL as string,
+      SSL_CANCEL_FRONTEND_URL: process.env.SSL_CANCEL_FRONTEND_URL as string,
+      SSL_SUCCESS_BACKEND_URL: process.env.SSL_SUCCESS_BACKEND_URL as string,
+      SSL_FAIL_BACKEND_URL: process.env.SSL_FAIL_BACKEND_URL as string,
+      SSL_CANCEL_BACKEND_URL: process.env.SSL_CANCEL_BACKEND_URL as string,
+      SSL_IPN_URL: process.env.SSL_IPN_URL as string,
+    },
+    CLOUDINARY: {
+      CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME as string,
+      CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY as string,
+      CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET as string,
+    },
+    //   EMAIL_SENDER: {
+    //     SMTP_USER: process.env.SMTP_USER as string,
+    //     SMTP_PASS: process.env.SMTP_PASS as string,
+    //     SMTP_PORT: process.env.SMTP_PORT as string,
+    //     SMTP_HOST: process.env.SMTP_HOST as string,
+    //     SMTP_FROM: process.env.SMTP_FROM as string,
+    //   },
+    //   REDIS_HOST: process.env.REDIS_HOST as string,
+    //   REDIS_PORT: process.env.REDIS_PORT as string,
+    //   REDIS_USERNAME: process.env.REDIS_USERNAME as string,
+    //   REDIS_PASSWORD: process.env.REDIS_PASSWORD as string,
+  };
+};
+
+export const envVars = loadEnvVariables();
+
+===== ./src/app/config/multer.config.ts =====
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary-v2";
+import { cloudinaryUpload } from "./cloudinary.config";
+
+const storage = new CloudinaryStorage({
+  // The adapter's TypeScript definition is incompatible with
+  // Cloudinary SDK v2's uploader callback types.
+  cloudinary: cloudinaryUpload as unknown as ConstructorParameters<
+    typeof CloudinaryStorage
+  >[0]["cloudinary"],
+
+  params: {
+    public_id: (_req, file) => {
+      // Example: My Special.Image#!@.png
+      // Result: unique-id-timestamp-my-special-image-png
+
+      const originalName = file.originalname.toLowerCase();
+
+      const fileName = originalName
+        .replace(/\.[^.]+$/, "")
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+
+      const extension = file.originalname.split(".").pop()?.toLowerCase();
+
+      const uniqueId = Math.random().toString(36).substring(2);
+
+      const uniqueFileName = [uniqueId, Date.now(), fileName || "upload"].join(
+        "-",
+      );
+
+      return extension ? `${uniqueFileName}.${extension}` : uniqueFileName;
+    },
+  },
+});
+
+export const multerUpload = multer({
+  storage,
+});
+
+===== ./src/app/config/passport.ts =====
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import bcryptjs from "bcryptjs";
+import passport from "passport";
+import {
+  Strategy as GoogleStrategy,
+  Profile,
+  VerifyCallback,
+} from "passport-google-oauth20";
+import { Strategy as LocalStrategy } from "passport-local";
+import { IsActive, Role } from "../modules/user/user.interface";
+import { User } from "../modules/user/user.model";
+import { envVars } from "./env";
+
+passport.use(
+  new LocalStrategy(
+    {
+      usernameField: "email",
+      passwordField: "password",
+    },
+    async (email: string, password: string, done) => {
+      try {
+        const isUserExist = await User.findOne({ email }).select("+password");
+
+        if (!isUserExist) {
+          return done(null, false, { message: "User does not exist" });
+        }
+
+        if (
+          isUserExist.isActive === IsActive.BLOCKED ||
+          isUserExist.isActive === IsActive.INACTIVE
+        ) {
+          return done(null, false, {
+            message: `User is ${isUserExist.isActive}`,
+          });
+        }
+
+        if (isUserExist.isDeleted) {
+          return done(null, false, { message: "User is deleted" });
+        }
+
+        const isGoogleAuthenticated = isUserExist.auths.some(
+          (providerObjects) => providerObjects.provider == "google",
+        );
+
+        if (isGoogleAuthenticated && !isUserExist.password) {
+          return done(null, false, {
+            message:
+              "You have authenticated through Google. So if you want to login with credentials, then at first login with google and set a password for your Gmail and then you can login with email and password.",
+          });
+        }
+
+        const isPasswordMatched = await bcryptjs.compare(
+          password as string,
+          isUserExist.password as string,
+        );
+
+        if (!isPasswordMatched) {
+          return done(null, false, { message: "Password does not match" });
+        }
+
+        return done(null, isUserExist);
+      } catch (error) {
+        console.log(error);
+        done(error);
+      }
+    },
+  ),
+);
+
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: envVars.GOOGLE_CLIENT_ID,
+      clientSecret: envVars.GOOGLE_CLIENT_SECRET,
+      callbackURL: envVars.GOOGLE_CALLBACK_URL,
+    },
+    async (
+      accessToken: string,
+      refreshToken: string,
+      profile: Profile,
+      done: VerifyCallback,
+    ) => {
+      try {
+        const email = profile.emails?.[0].value;
+
+        if (!email) {
+          return done(null, false, { message: "No email found" });
+        }
+
+        let isUserExist = await User.findOne({ email });
+        if (
+          isUserExist &&
+          (isUserExist.isActive === IsActive.BLOCKED ||
+            isUserExist.isActive === IsActive.INACTIVE)
+        ) {
+          return done(null, false, {
+            message: `User is ${isUserExist.isActive}`,
+          });
+        }
+
+        if (isUserExist && isUserExist.isDeleted) {
+          return done(null, false, { message: "User is deleted" });
+        }
+
+        if (!isUserExist) {
+          isUserExist = await User.create({
+            email,
+            name: profile.displayName,
+            picture: profile.photos?.[0].value,
+            role: Role.USER,
+            auths: [
+              {
+                provider: "google",
+                providerId: profile.id,
+              },
+            ],
+          });
+        }
+
+        return done(null, isUserExist);
+      } catch (error) {
+        console.log("Google Strategy Error", error);
+        return done(error);
+      }
+    },
+  ),
+);
+
+passport.serializeUser((user: any, done: (err: any, id?: unknown) => void) => {
+  done(null, user._id);
+});
+
+passport.deserializeUser(async (id: string, done: any) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (error) {
+    console.log(error);
+    done(error);
+  }
+});
+
+===== ./src/app/constant.ts =====
+export const excludeField = ["searchTerm", "sort", "fields", "page", "limit"];
+
+===== ./src/app/errorHelpers/AppError.ts =====
+class AppError extends Error {
+  public statusCode: number;
+
+  constructor(statusCode: number, message: string, stack = "") {
+    super(message); // throw new Error("Something went wrong")
+    this.statusCode = statusCode;
+
+    if (stack) {
+      this.stack = stack;
+    } else {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+}
+
+export default AppError;
+
+===== ./src/app/helpers/handleCastError.ts =====
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import mongoose from "mongoose";
+import { TGenericErrorResponse } from "../interfaces/error.types";
+
+export const handleCastError = (
+  err: mongoose.Error.CastError,
+): TGenericErrorResponse => {
+  return {
+    statusCode: 400,
+    message: "Invalid MongoDB ObjectID. Please provide a valid id",
+  };
+};
+
+===== ./src/app/helpers/handleDuplicateError.ts =====
+import { TGenericErrorResponse } from "../interfaces/error.types";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const handlerDuplicateError = (err: any): TGenericErrorResponse => {
+  const matchedArray = err.message.match(/"([^"]*)"/);
+
+  return {
+    statusCode: 400,
+    message: `${matchedArray[1]} already exists!!`,
+  };
+};
+
+===== ./src/app/helpers/handlerValidationError.ts =====
+import mongoose from "mongoose";
+import {
+  TErrorSources,
+  TGenericErrorResponse,
+} from "../interfaces/error.types";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const handlerValidationError = (
+  err: mongoose.Error.ValidationError,
+): TGenericErrorResponse => {
+  const errorSources: TErrorSources[] = [];
+
+  const errors = Object.values(err.errors);
+
+  errors.forEach((errorObject: any) =>
+    errorSources.push({
+      path: errorObject.path,
+      message: errorObject.message,
+    }),
+  );
+
+  return {
+    statusCode: 400,
+    message: "Validation Error",
+    errorSources,
+  };
+};
+
+===== ./src/app/helpers/handlerZodError.ts =====
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  TErrorSources,
+  TGenericErrorResponse,
+} from "../interfaces/error.types";
+
+export const handlerZodError = (err: any): TGenericErrorResponse => {
+  const errorSources: TErrorSources[] = [];
+
+  err.issues.forEach((issue: any) => {
+    errorSources.push({
+      //path : "nickname iside lastname inside name"
+      // path: issue.path.length > 1 && issue.path.reverse().join(" inside "),
+
+      path: issue.path[issue.path.length - 1],
+      message: issue.message,
+    });
+  });
+
+  return {
+    statusCode: 400,
+    message: "Zod Error",
+    errorSources,
+  };
+};
+
+===== ./src/app/interfaces/error.types.ts =====
+export interface TErrorSources {
+  path: string;
+  message: string;
+}
+
+export interface TGenericErrorResponse {
+  statusCode: number;
+  message: string;
+  errorSources?: TErrorSources[];
+}
+
+===== ./src/app/interfaces/index.d.ts =====
+import { JwtPayload } from "jsonwebtoken";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user: JwtPayload;
+    }
+  }
+}
+
+===== ./src/app/middlewares/checkAuth.ts =====
+import { NextFunction, Request, Response } from "express";
+import httpStatus from "http-status-codes";
+import { JwtPayload } from "jsonwebtoken";
+import { envVars } from "../config/env";
+import AppError from "../errorHelpers/AppError";
+import { IsActive, Role } from "../modules/user/user.interface";
+import { User } from "../modules/user/user.model";
+import { verifyToken } from "../utils/jwt";
+
+const isValidRole = (role: unknown): role is Role => {
+  return Object.values(Role).some((validRole) => validRole === role);
+};
+
+export const checkAuth =
+  (...authRoles: Role[]) =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const authorization = req.headers.authorization;
+
+      const accessToken = authorization?.replace(/^Bearer\s+/i, "").trim();
+
+      if (!accessToken) {
+        throw new AppError(
+          httpStatus.UNAUTHORIZED,
+          "Access token is required.",
+        );
+      }
+
+      let decoded: string | JwtPayload;
+
+      try {
+        decoded = verifyToken(accessToken, envVars.JWT_ACCESS_SECRET) as
+          | string
+          | JwtPayload;
+      } catch {
+        throw new AppError(
+          httpStatus.UNAUTHORIZED,
+          "Invalid or expired access token.",
+        );
+      }
+
+      if (
+        typeof decoded !== "object" ||
+        decoded === null ||
+        typeof decoded.email !== "string" ||
+        !isValidRole(decoded.role)
+      ) {
+        throw new AppError(
+          httpStatus.UNAUTHORIZED,
+          "Invalid access token payload.",
+        );
+      }
+
+      const user = await User.findOne({ email: decoded.email });
+
+      if (!user) {
+        throw new AppError(httpStatus.UNAUTHORIZED, "User does not exist.");
+      }
+
+      if (user.isDeleted) {
+        throw new AppError(httpStatus.FORBIDDEN, "This account is deleted.");
+      }
+
+      if (
+        user.isActive === IsActive.BLOCKED ||
+        user.isActive === IsActive.INACTIVE
+      ) {
+        throw new AppError(httpStatus.FORBIDDEN, `User is ${user.isActive}.`);
+      }
+
+      // Always authorize using the current database role.
+      if (!authRoles.includes(user.role)) {
+        throw new AppError(
+          httpStatus.FORBIDDEN,
+          "You are not permitted to access this resource.",
+        );
+      }
+
+      req.user = {
+        ...decoded,
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      } as JwtPayload;
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+
+===== ./src/app/middlewares/globalErrorHandler.ts =====
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { NextFunction, Request, Response } from "express";
+
+import { deleteImageFromCLoudinary } from "../config/cloudinary.config";
+import { envVars } from "../config/env";
+import AppError from "../errorHelpers/AppError";
+import { handleCastError } from "../helpers/handleCastError";
+import { handlerDuplicateError } from "../helpers/handleDuplicateError";
+import { handlerValidationError } from "../helpers/handlerValidationError";
+import { handlerZodError } from "../helpers/handlerZodError";
+import { TErrorSources } from "../interfaces/error.types";
+
+export const globalErrorHandler = async (
+  err: any,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  if (envVars.NODE_ENV === "development") {
+    console.log(err);
+  }
+  console.log({ file: req.files });
+  if (req.file) {
+    await deleteImageFromCLoudinary(req.file.path);
+  }
+
+  if (req.files && Array.isArray(req.files) && req.files.length) {
+    const imageUrls = (req.files as Express.Multer.File[]).map(
+      (file) => file.path,
+    );
+
+    await Promise.all(imageUrls.map((url) => deleteImageFromCLoudinary(url)));
+  }
+
+  let errorSources: TErrorSources[] = [];
+  let statusCode = 500;
+  let message = "Something Went Wrong!!";
+
+  //Duplicate error
+  if (err.code === 11000) {
+    const simplifiedError = handlerDuplicateError(err);
+    statusCode = simplifiedError.statusCode;
+    message = simplifiedError.message;
+  }
+  // Object ID error / Cast Error
+  else if (err.name === "CastError") {
+    const simplifiedError = handleCastError(err);
+    statusCode = simplifiedError.statusCode;
+    message = simplifiedError.message;
+  } else if (err.name === "ZodError") {
+    const simplifiedError = handlerZodError(err);
+    statusCode = simplifiedError.statusCode;
+    message = simplifiedError.message;
+    errorSources = simplifiedError.errorSources as TErrorSources[];
+  }
+  //Mongoose Validation Error
+  else if (err.name === "ValidationError") {
+    const simplifiedError = handlerValidationError(err);
+    statusCode = simplifiedError.statusCode;
+    errorSources = simplifiedError.errorSources as TErrorSources[];
+    message = simplifiedError.message;
+  } else if (err instanceof AppError) {
+    statusCode = err.statusCode;
+    message = err.message;
+  } else if (err instanceof Error) {
+    statusCode = 500;
+    message = err.message;
+  }
+
+  res.status(statusCode).json({
+    success: false,
+    message,
+    errorSources,
+    err: envVars.NODE_ENV === "development" ? err : null,
+    stack: envVars.NODE_ENV === "development" ? err.stack : null,
+  });
+};
+
+===== ./src/app/middlewares/notFound.ts =====
+import { Request, Response } from "express";
+import httpStatus from "http-status-codes";
+
+const notFound = (req: Request, res: Response) => {
+  res.status(httpStatus.NOT_FOUND).json({
+    success: false,
+    message: "Route Not Found",
+  });
+};
+
+export default notFound;
+
+===== ./src/app/middlewares/validateRequest.ts =====
+import { NextFunction, Request, Response } from "express";
+import { ZodObject } from "zod";
+
+export const validateRequest =
+  (zodSchema: ZodObject) =>
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // req.body =JSON.parse(req.body.data || {}) || req.body
+      if (req.body.data) {
+        req.body = JSON.parse(req.body.data);
+      }
+      req.body = await zodSchema.parseAsync(req.body);
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+
+===== ./src/app/modules/auth/auth.controller.ts =====
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { NextFunction, Request, Response } from "express";
+import httpStatus from "http-status-codes";
+import { JwtPayload } from "jsonwebtoken";
+import passport from "passport";
+import { envVars } from "../../config/env";
+import AppError from "../../errorHelpers/AppError";
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
+import { setAuthCookie } from "../../utils/setCookie";
+import { createUserTokens } from "../../utils/userTokens";
+import { AuthServices } from "./auth.service";
+
+const credentialsLogin = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    // const loginInfo = await AuthServices.credentialsLogin(req.body)
+
+    passport.authenticate("local", async (err: any, user: any, info: any) => {
+      if (err) {
+        return next(new AppError(401, err));
+      }
+
+      if (!user) {
+        return next(new AppError(401, info.message));
+      }
+
+      const userTokens = await createUserTokens(user);
+      const { password: pass, ...rest } = user.toObject();
+      setAuthCookie(res, userTokens);
+      sendResponse(res, {
+        success: true,
+        statusCode: httpStatus.OK,
+        message: "User Logged In Successfully",
+        data: {
+          accessToken: userTokens.accessToken,
+          refreshToken: userTokens.refreshToken,
+          user: rest,
+        },
+      });
+    })(req, res, next);
+  },
+);
+
+const getNewAccessToken = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "No refresh token recieved from cookies",
+      );
+    }
+    const tokenInfo = await AuthServices.getNewAccessToken(
+      refreshToken as string,
+    );
+    setAuthCookie(res, tokenInfo);
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "New Access Token Retrived Successfully",
+      data: tokenInfo,
+    });
+  },
+);
+const logout = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "User Logged Out Successfully",
+      data: null,
+    });
+  },
+);
+const changePassword = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const newPassword = req.body.newPassword;
+    const oldPassword = req.body.oldPassword;
+    const decodedToken = req.user;
+    await AuthServices.changePassword(
+      oldPassword,
+      newPassword,
+      decodedToken as JwtPayload,
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Password Changed Successfully",
+      data: null,
+    });
+  },
+);
+const resetPassword = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const decodedToken = req.user;
+    await AuthServices.resetPassword(req.body, decodedToken as JwtPayload);
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Password Changed Successfully",
+      data: null,
+    });
+  },
+);
+const setPassword = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const decodedToken = req.user as JwtPayload;
+    const { password } = req.body;
+    await AuthServices.setPassword(decodedToken.userId, password);
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Password Changed Successfully",
+      data: null,
+    });
+  },
+);
+const forgotPassword = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { email } = req.body;
+    await AuthServices.forgotPassword(email);
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Email Sent Successfully",
+      data: null,
+    });
+  },
+);
+const googleCallbackController = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    let redirectTo = req.query.state ? (req.query.state as string) : "";
+
+    if (redirectTo.startsWith("/")) {
+      redirectTo = redirectTo.slice(1);
+    }
+
+    const user = req.user as any;
+
+    if (!user) {
+      throw new AppError(httpStatus.NOT_FOUND, "User Not Found");
+    }
+
+    const tokenInfo = createUserTokens(user);
+
+    setAuthCookie(res, tokenInfo);
+
+    // sendResponse(res, {
+    //     success: true,
+    //     statusCode: httpStatus.OK,
+    //     message: "Password Changed Successfully",
+    //     data: null,
+    // })
+
+    res.redirect(`${envVars.FRONTEND_URL}/${redirectTo}`);
+  },
+);
+
+export const AuthControllers = {
+  credentialsLogin,
+  getNewAccessToken,
+  logout,
+  resetPassword,
+  setPassword,
+  forgotPassword,
+  changePassword,
+  googleCallbackController,
+};
+
+===== ./src/app/modules/auth/auth.route.ts =====
+import { NextFunction, Request, Response, Router } from "express";
+import passport from "passport";
+import { envVars } from "../../config/env";
+import { checkAuth } from "../../middlewares/checkAuth";
+import { Role } from "../user/user.interface";
+import { AuthControllers } from "./auth.controller";
+
+const router = Router();
+
+router.post("/login", AuthControllers.credentialsLogin);
+router.post("/refresh-token", AuthControllers.getNewAccessToken);
+router.post("/logout", AuthControllers.logout);
+router.post(
+  "/change-password",
+  checkAuth(...Object.values(Role)),
+  AuthControllers.changePassword,
+);
+router.post(
+  "/set-password",
+  checkAuth(...Object.values(Role)),
+  AuthControllers.setPassword,
+);
+router.post("/forgot-password", AuthControllers.forgotPassword);
+router.post(
+  "/reset-password",
+  checkAuth(...Object.values(Role)),
+  AuthControllers.resetPassword,
+);
+
+router.get(
+  "/google",
+  async (req: Request, res: Response, next: NextFunction) => {
+    const redirect = req.query.redirect || "/";
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+      state: redirect as string,
+    })(req, res, next);
+  },
+);
+
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: `${envVars.FRONTEND_URL}/login?error=There is some issues with your account. Please contact with out support team!`,
+  }),
+  AuthControllers.googleCallbackController,
+);
+
+export const AuthRoutes = router;
+
+===== ./src/app/modules/auth/auth.service.ts =====
+import bcryptjs from "bcryptjs";
+import httpStatus from "http-status-codes";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { envVars } from "../../config/env";
+import AppError from "../../errorHelpers/AppError";
+import { sendEmail } from "../../utils/sendEmail";
+import {
+  createNewAccessTokenWithRefreshToken,
+  createUserTokens,
+} from "../../utils/userTokens";
+import { IAuthProvider, IsActive, IUser } from "../user/user.interface";
+import { User } from "../user/user.model";
+
+const credentialsLogin = async (payload: Partial<IUser>) => {
+  const { email, password } = payload;
+
+  const isUserExist = await User.findOne({ email });
+
+  if (!isUserExist) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Email does not exist");
+  }
+
+  const isPasswordMatched = await bcryptjs.compare(
+    password as string,
+    isUserExist.password as string,
+  );
+
+  if (!isPasswordMatched) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Incorrect Password");
+  }
+
+  const userTokens = createUserTokens(isUserExist);
+  const { password: pass, ...rest } = isUserExist.toObject();
+
+  return {
+    accessToken: userTokens.accessToken,
+    refreshToken: userTokens.refreshToken,
+    user: rest,
+  };
+};
+
+const getNewAccessToken = async (refreshToken: string) => {
+  const newAccessToken =
+    await createNewAccessTokenWithRefreshToken(refreshToken);
+
+  return {
+    accessToken: newAccessToken,
+  };
+};
+const resetPassword = async (
+  payload: Record<string, any>,
+  decodedToken: JwtPayload,
+) => {
+  if (payload.id != decodedToken.userId) {
+    throw new AppError(401, "You can not reset your password");
+  }
+
+  const isUserExist = await User.findById(decodedToken.userId);
+  if (!isUserExist) {
+    throw new AppError(401, "User does not exist");
+  }
+
+  const hashedPassword = await bcryptjs.hash(
+    payload.newPassword,
+    Number(envVars.BCRYPT_SALT_ROUND),
+  );
+
+  isUserExist.password = hashedPassword;
+
+  await isUserExist.save();
+};
+const forgotPassword = async (email: string) => {
+  const isUserExist = await User.findOne({ email });
+
+  if (!isUserExist) {
+    throw new AppError(httpStatus.BAD_REQUEST, "User does not exist");
+  }
+  if (
+    isUserExist.isActive === IsActive.BLOCKED ||
+    isUserExist.isActive === IsActive.INACTIVE
+  ) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      `User is ${isUserExist.isActive}`,
+    );
+  }
+  if (isUserExist.isDeleted) {
+    throw new AppError(httpStatus.BAD_REQUEST, "User is deleted");
+  }
+
+  const jwtPayload = {
+    userId: isUserExist._id,
+    email: isUserExist.email,
+    role: isUserExist.role,
+  };
+
+  const resetToken = jwt.sign(jwtPayload, envVars.JWT_ACCESS_SECRET, {
+    expiresIn: "10m",
+  });
+
+  const resetUILink = `${envVars.FRONTEND_URL}/reset-password?id=${isUserExist._id}&token=${resetToken}`;
+
+  sendEmail({
+    to: isUserExist.email,
+    subject: "Password Reset",
+    templateName: "forgetPassword",
+    templateData: {
+      name: isUserExist.name,
+      resetUILink,
+    },
+  });
+};
+const setPassword = async (userId: string, plainPassword: string) => {
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new AppError(404, "User not found");
+  }
+
+  if (
+    user.password &&
+    user.auths.some((providerObject) => providerObject.provider === "google")
+  ) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "You have already set you password. Now you can change the password from your profile password update",
+    );
+  }
+
+  const hashedPassword = await bcryptjs.hash(
+    plainPassword,
+    Number(envVars.BCRYPT_SALT_ROUND),
+  );
+
+  const credentialProvider: IAuthProvider = {
+    provider: "credentials",
+    providerId: user.email,
+  };
+
+  const auths: IAuthProvider[] = [...user.auths, credentialProvider];
+
+  user.password = hashedPassword;
+
+  user.auths = auths;
+
+  await user.save();
+};
+const changePassword = async (
+  oldPassword: string,
+  newPassword: string,
+  decodedToken: JwtPayload,
+) => {
+  const user = await User.findById(decodedToken.userId);
+
+  const isOldPasswordMatch = await bcryptjs.compare(
+    oldPassword,
+    user!.password as string,
+  );
+  if (!isOldPasswordMatch) {
+    throw new AppError(httpStatus.UNAUTHORIZED, "Old Password does not match");
+  }
+
+  user!.password = await bcryptjs.hash(
+    newPassword,
+    Number(envVars.BCRYPT_SALT_ROUND),
+  );
+
+  user!.save();
+};
+
+export const AuthServices = {
+  credentialsLogin,
+  getNewAccessToken,
+  changePassword,
+  setPassword,
+  forgotPassword,
+  resetPassword,
+};
+
+===== ./src/app/modules/booking/booking.controller.ts =====
+import { Request, Response } from "express";
+// import catchAsync from "../utils/catchAsync";
+import { JwtPayload } from "jsonwebtoken";
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
+import { BookingService } from "./booking.service";
+
+const createBooking = catchAsync(async (req: Request, res: Response) => {
+  const decodeToken = req.user as JwtPayload;
+  const booking = await BookingService.createBooking(
+    req.body,
+    decodeToken.userId,
+  );
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Booking created successfully",
+    data: booking,
+  });
+});
+
+const getUserBookings = catchAsync(async (req: Request, res: Response) => {
+  const bookings = await BookingService.getUserBookings();
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Bookings retrieved successfully",
+    data: bookings,
+  });
+});
+const getSingleBooking = catchAsync(async (req: Request, res: Response) => {
+  const booking = await BookingService.getBookingById();
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Booking retrieved successfully",
+    data: booking,
+  });
+});
+
+const getAllBookings = catchAsync(async (req: Request, res: Response) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const bookings = await BookingService.getAllBookings();
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Bookings retrieved successfully",
+    data: {},
+    // meta: {},
+  });
+});
+
+const updateBookingStatus = catchAsync(async (req: Request, res: Response) => {
+  const updated = await BookingService.updateBookingStatus();
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Booking Status Updated Successfully",
+    data: updated,
+  });
+});
+
+export const BookingController = {
+  createBooking,
+  getAllBookings,
+  getSingleBooking,
+  getUserBookings,
+  updateBookingStatus,
+};
+
+===== ./src/app/modules/booking/booking.interface.ts =====
+import { Types } from "mongoose";
+
+export enum BOOKING_STATUS {
+  PENDING = "PENDING",
+  CONFIRMED = "CONFIRMED",
+  CANCELLED = "CANCELLED",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+  EXPIRED = "EXPIRED",
+}
+
+export interface ITraveler {
+  name: string;
+  age: number;
+  gender: "male" | "female" | "other";
+  type: "adult" | "child";
+  nidOrPassport?: string;
+}
+
+export interface IContactInfo {
+  name: string;
+  phone: string;
+  email: string;
+  emergencyContact?: string;
+}
+
+export interface IPriceBreakdown {
+  adultPrice: number;
+  childPrice?: number;
+  adultCount: number;
+  childCount: number;
+  subtotal: number;
+  discountAmount: number;
+  total: number;
+}
+
+export interface IBooking {
+  bookingNumber: string; // "TH-20250115-0001"
+  user: Types.ObjectId;
+  tour: Types.ObjectId; // denormalized for queries
+  tourDeparture: Types.ObjectId;
+  payment?: Types.ObjectId; // quick access (source of truth: payment.booking)
+
+  travelers: ITraveler[];
+  adultCount: number;
+  childCount: number;
+  guestCount: number; // adultCount + childCount
+
+  contactInfo: IContactInfo;
+
+  priceBreakdown: IPriceBreakdown;
+  couponCode?: string;
+
+  status: BOOKING_STATUS;
+  reservationExpiresAt?: Date;
+  confirmedAt?: Date;
+  cancelledAt?: Date;
+  cancellationReason?: string;
+
+  specialRequests?: string;
+
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+===== ./src/app/modules/booking/booking.model.ts =====
+import { model, Schema } from "mongoose";
+import {
+  BOOKING_STATUS,
+  IBooking,
+  IContactInfo,
+  IPriceBreakdown,
+  ITraveler,
+} from "./booking.interface";
+
+/* ============================================================
+ *  SUB-SCHEMAS
+ * ============================================================ */
+
+const travelerSchema = new Schema<ITraveler>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    age: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 120,
+    },
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      required: true,
+    },
+    type: {
+      type: String,
+      enum: ["adult", "child"],
+      required: true,
+    },
+    nidOrPassport: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
+const contactInfoSchema = new Schema<IContactInfo>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+    },
+    emergencyContact: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
+const priceBreakdownSchema = new Schema<IPriceBreakdown>(
+  {
+    adultPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    childPrice: {
+      type: Number,
+      min: 0,
+    },
+    adultCount: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    childCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    subtotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    total: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false },
+);
+
+/* ============================================================
+ *  BOOKING SCHEMA
+ * ============================================================ */
+
+const bookingSchema = new Schema<IBooking>(
+  {
+    bookingNumber: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      index: true,
+    },
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    tour: {
+      type: Schema.Types.ObjectId,
+      ref: "Tour",
+      required: true,
+    },
+    tourDeparture: {
+      type: Schema.Types.ObjectId,
+      ref: "TourDeparture",
+      required: true,
+    },
+    payment: {
+      type: Schema.Types.ObjectId,
+      ref: "Payment",
+    },
+
+    travelers: {
+      type: [travelerSchema],
+      required: true,
+      validate: {
+        validator: (v: ITraveler[]) => v.length > 0,
+        message: "At least one traveler is required",
+      },
+    },
+    adultCount: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    childCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    guestCount: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
+    contactInfo: {
+      type: contactInfoSchema,
+      required: true,
+    },
+
+    priceBreakdown: {
+      type: priceBreakdownSchema,
+      required: true,
+    },
+    couponCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+    },
+
+    status: {
+      type: String,
+      enum: Object.values(BOOKING_STATUS),
+      default: BOOKING_STATUS.PENDING,
+    },
+    reservationExpiresAt: {
+      type: Date,
+    },
+    confirmedAt: {
+      type: Date,
+    },
+    cancelledAt: {
+      type: Date,
+    },
+    cancellationReason: {
+      type: String,
+      trim: true,
+    },
+
+    specialRequests: {
+      type: String,
+      trim: true,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+/* ============================================================
+ *  INDEXES
+ * ============================================================ */
+
+bookingSchema.index({ user: 1, createdAt: -1 });
+bookingSchema.index({ tourDeparture: 1, status: 1 });
+bookingSchema.index({ status: 1, reservationExpiresAt: 1 });
+bookingSchema.index({ tour: 1, status: 1 });
+bookingSchema.index({ status: 1, createdAt: -1 });
+
+/* ============================================================
+ *  HOOKS
+ * ============================================================ */
+
+// guestCount = adultCount + childCount — auto sync
+bookingSchema.pre("save", function () {
+  if (this.isModified("adultCount") || this.isModified("childCount")) {
+    this.guestCount = this.adultCount + this.childCount;
+  }
+});
+
+// Confirmed/Cancelled হলে timestamp সেট
+bookingSchema.pre("save", function () {
+  if (
+    this.isModified("status") &&
+    this.status === BOOKING_STATUS.CONFIRMED &&
+    !this.confirmedAt
+  ) {
+    this.confirmedAt = new Date();
+  }
+  if (
+    this.isModified("status") &&
+    this.status === BOOKING_STATUS.CANCELLED &&
+    !this.cancelledAt
+  ) {
+    this.cancelledAt = new Date();
+  }
+});
+
+/* ============================================================
+ *  MODEL
+ * ============================================================ */
+
+export const Booking = model<IBooking>("Booking", bookingSchema);
+
+===== ./src/app/modules/booking/booking.route.ts =====
+import express from "express";
+
+import { checkAuth } from "../../middlewares/checkAuth";
+import { validateRequest } from "../../middlewares/validateRequest";
+import { Role } from "../user/user.interface";
+import { BookingController } from "./booking.controller";
+import {
+  createBookingZodSchema,
+  updateBookingStatusZodSchema,
+} from "./booking.validation";
+
+const router = express.Router();
+
+// api/v1/booking
+router.post(
+  "/",
+  checkAuth(...Object.values(Role)),
+  validateRequest(createBookingZodSchema),
+  BookingController.createBooking,
+);
+
+// api/v1/booking
+router.get(
+  "/",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  BookingController.getAllBookings,
+);
+
+// api/v1/booking/my-bookings
+router.get(
+  "/my-bookings",
+  checkAuth(...Object.values(Role)),
+  BookingController.getUserBookings,
+);
+
+// api/v1/booking/bookingId
+router.get(
+  "/:bookingId",
+  checkAuth(...Object.values(Role)),
+  BookingController.getSingleBooking,
+);
+
+// api/v1/booking/bookingId/status
+router.patch(
+  "/:bookingId/status",
+  checkAuth(...Object.values(Role)),
+  validateRequest(updateBookingStatusZodSchema),
+  BookingController.updateBookingStatus,
+);
+
+export const BookingRoutes = router;
+
+===== ./src/app/modules/booking/booking.service.ts =====
+// /* eslint-disable @typescript-eslint/no-explicit-any */
+// import httpStatus from "http-status-codes";
+// import AppError from "../../errorHelpers/AppError";
+// import { getTransactionId } from "../../utils/getTransactionId";
+
+// import { PAYMENT_STATUS } from "../payment/payment.interface";
+// import { Payment } from "../payment/payment.model";
+// import { ISSLCommerz } from "../sslCommerz/sslCommerz.interface";
+// import { SSLService } from "../sslCommerz/sslCommerz.service";
+// import { Tour } from "../tour/tour.model";
+// import { User } from "../user/user.model";
+// import { BOOKING_STATUS, IBooking } from "./booking.interface";
+// import { Booking } from "./booking.model";
+
+// const createBooking = async (payload: Partial<IBooking>, userId: string) => {
+//   const transactionId = getTransactionId();
+
+//   const session = await Booking.startSession();
+//   session.startTransaction();
+
+//   try {
+//     const user = await User.findById(userId);
+
+//     if (!user?.phone || !user.address) {
+//       throw new AppError(
+//         httpStatus.BAD_REQUEST,
+//         "Please Update Your Profile to Book a Tour.",
+//       );
+//     }
+
+//     const tour = await Tour.findById(payload.tour).select("costFrom");
+
+//     if (!tour?.costFrom) {
+//       throw new AppError(httpStatus.BAD_REQUEST, "No Tour Cost Found!");
+//     }
+
+//     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+//     const amount = Number(tour.costFrom) * Number(payload.guestCount!);
+
+//     const booking = await Booking.create(
+//       [
+//         {
+//           user: userId,
+//           status: BOOKING_STATUS.PENDING,
+//           ...payload,
+//         },
+//       ],
+//       { session },
+//     );
+
+//     const payment = await Payment.create(
+//       [
+//         {
+//           booking: booking[0]._id,
+//           status: PAYMENT_STATUS.UNPAID,
+//           transactionId: transactionId,
+//           amount: amount,
+//         },
+//       ],
+//       { session },
+//     );
+
+//     const updatedBooking = await Booking.findByIdAndUpdate(
+//       booking[0]._id,
+//       { payment: payment[0]._id },
+//       { new: true, runValidators: true, session },
+//     )
+//       .populate("user", "name email phone address")
+//       .populate("tour", "title costFrom")
+//       .populate("payment");
+
+//     const userAddress = (updatedBooking?.user as any).address;
+//     const userEmail = (updatedBooking?.user as any).email;
+//     const userPhoneNumber = (updatedBooking?.user as any).phone;
+//     const userName = (updatedBooking?.user as any).name;
+
+//     const sslPayload: ISSLCommerz = {
+//       address: userAddress,
+//       email: userEmail,
+//       phoneNumber: userPhoneNumber,
+//       name: userName,
+//       amount: amount,
+//       transactionId: transactionId,
+//     };
+
+//     const sslPayment = await SSLService.sslPaymentInit(sslPayload);
+
+//     console.log(sslPayment);
+
+//     await session.commitTransaction(); //transaction
+//     session.endSession();
+//     return {
+//       paymentUrl: sslPayment.GatewayPageURL,
+//       booking: updatedBooking,
+//     };
+//   } catch (error) {
+//     await session.abortTransaction(); // rollback
+//     session.endSession();
+//     throw error;
+//   }
+// };
+
+// const getUserBookings = async () => {
+//   return {};
+// };
+
+// const getBookingById = async () => {
+//   return {};
+// };
+
+// const updateBookingStatus = async () => {
+//   return {};
+// };
+
+// const getAllBookings = async () => {
+//   return {};
+// };
+
+// export const BookingService = {
+//   createBooking,
+//   getUserBookings,
+//   getBookingById,
+//   updateBookingStatus,
+//   getAllBookings,
+// };
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import httpStatus from "http-status-codes";
+import mongoose from "mongoose";
+import AppError from "../../errorHelpers/AppError";
+import { getTransactionId } from "../../utils/getTransactionId";
+
+import { PAYMENT_STATUS } from "../payment/payment.interface";
+import { Payment } from "../payment/payment.model";
+import { ISSLCommerz } from "../sslCommerz/sslCommerz.interface";
+import { SSLService } from "../sslCommerz/sslCommerz.service";
+import {
+  TOUR_DEPARTURE_STATUS as DEPARTURE_STATUS,
+  TOUR_DEPARTURE_STATUS,
+} from "../tour-departure/tour-departure.interface";
+import { TourDeparture } from "../tour-departure/tour-departure.model";
+import { User } from "../user/user.model";
+import { BOOKING_STATUS, IBooking } from "./booking.interface";
+import { Booking } from "./booking.model";
+
+const RESERVATION_DURATION_MS = 15 * 60 * 1000;
+
+const createBooking = async (payload: Partial<IBooking>, userId: string) => {
+  const guestCount = Number(payload.guestCount);
+  const departureId = payload.tourDeparture;
+
+  if (!departureId || !mongoose.isValidObjectId(departureId)) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "A valid tour departure is required.",
+    );
+  }
+
+  if (!Number.isInteger(guestCount) || guestCount < 1) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Guest count must be at least 1.",
+    );
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found.");
+  }
+
+  if (!user.phone || !user.address) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Please update your profile before booking a tour.",
+    );
+  }
+
+  const session = await mongoose.startSession();
+
+  let bookingId: mongoose.Types.ObjectId;
+  let transactionId: string;
+  let amount: number;
+
+  try {
+    session.startTransaction();
+
+    // Atomically reserve seats to prevent overbooking.
+    const departure = await TourDeparture.findOneAndUpdate(
+      {
+        _id: departureId,
+        status: DEPARTURE_STATUS.OPEN,
+        availableSeats: { $gte: guestCount },
+      },
+      {
+        $inc: { availableSeats: -guestCount },
+      },
+      {
+        new: true,
+        runValidators: true,
+        session,
+      },
+    );
+
+    if (!departure) {
+      throw new AppError(
+        httpStatus.CONFLICT,
+        "Departure is unavailable or there are not enough seats.",
+      );
+    }
+
+    if (departure.availableSeats === 0) {
+      departure.status = TOUR_DEPARTURE_STATUS.FULL;
+      await departure.save({ session });
+    }
+
+    const pricePerPerson = departure.pricePerPerson;
+    amount = pricePerPerson * guestCount;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new AppError(httpStatus.BAD_REQUEST, "Invalid booking amount.");
+    }
+
+    const reservationExpiresAt = new Date(Date.now() + RESERVATION_DURATION_MS);
+
+    const [booking] = await Booking.create(
+      [
+        {
+          user: user._id,
+          tourDeparture: departure._id,
+          guestCount,
+          pricePerPerson,
+          totalAmount: amount,
+          status: BOOKING_STATUS.PENDING,
+          reservationExpiresAt,
+        },
+      ],
+      { session },
+    );
+
+    transactionId = getTransactionId();
+
+    const [payment] = await Payment.create(
+      [
+        {
+          booking: booking._id,
+          transactionId,
+          amount,
+          currency: "BDT",
+          status: PAYMENT_STATUS.PENDING,
+        },
+      ],
+      { session },
+    );
+
+    await Booking.findByIdAndUpdate(
+      booking._id,
+      { payment: payment._id },
+      {
+        new: true,
+        runValidators: true,
+        session,
+      },
+    );
+
+    bookingId = booking._id;
+
+    await session.commitTransaction();
+  } catch (error) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  // Call the external gateway only after the database transaction commits.
+  const sslPayload: ISSLCommerz = {
+    address: user.address,
+    email: user.email,
+    phoneNumber: user.phone,
+    name: user.name,
+    amount,
+    transactionId: transactionId!,
+  };
+
+  const sslPayment = await SSLService.sslPaymentInit(sslPayload);
+
+  const booking = await Booking.findById(bookingId!)
+    .populate("user", "name email phone address")
+    .populate({
+      path: "tourDeparture",
+      populate: {
+        path: "tour",
+        select: "title slug",
+      },
+    })
+    .populate("payment");
+
+  return {
+    paymentUrl: sslPayment.GatewayPageURL,
+    booking,
+  };
+};
+
+const getUserBookings = async () => {
+  return {};
+};
+
+const getBookingById = async () => {
+  return {};
+};
+
+const updateBookingStatus = async () => {
+  return {};
+};
+
+const getAllBookings = async () => {
+  return {};
+};
+
+export const BookingService = {
+  createBooking,
+  getUserBookings,
+  getBookingById,
+  updateBookingStatus,
+  getAllBookings,
+};
+
+===== ./src/app/modules/booking/booking.validation.ts =====
+import { z } from "zod";
+import { BOOKING_STATUS } from "./booking.interface";
+
+/* ============================================================
+ *  REUSABLE SUB-SCHEMAS
+ * ============================================================ */
+
+const travelerSchema = z.object({
+  name: z.string().min(1, "Traveler name is required").trim(),
+  age: z
+    .number()
+    .int()
+    .min(0, "Age cannot be negative")
+    .max(120, "Age seems invalid"),
+  gender: z.enum(["male", "female", "other"]),
+  type: z.enum(["adult", "child"]),
+  nidOrPassport: z.string().optional(),
+});
+
+const contactInfoSchema = z.object({
+  name: z.string().min(1, "Contact name is required").trim(),
+  phone: z.string().min(1, "Phone is required").trim(),
+  email: z.string().email("Invalid email").trim().toLowerCase(),
+  emergencyContact: z.string().optional(),
+});
+
+/* ============================================================
+ *  BOOKING — CREATE
+ * ============================================================ */
+
+export const createBookingZodSchema = z
+  .object({
+    tourDeparture: z.string().min(1, "Tour departure is required"),
+
+    travelers: z
+      .array(travelerSchema)
+      .min(1, "At least one traveler is required"),
+
+    adultCount: z.number().int().min(1, "At least one adult is required"),
+    childCount: z.number().int().min(0).optional(),
+
+    contactInfo: contactInfoSchema,
+
+    couponCode: z.string().trim().toUpperCase().optional(),
+    specialRequests: z.string().optional(),
+
+    // ⚠️ বাদ: bookingNumber, user, tour, payment, guestCount,
+    //        priceBreakdown, status, reservationExpiresAt
+    //        — এগুলো সব server তৈরি করবে
+  })
+  .refine(
+    (data) => {
+      const expected = data.adultCount + (data.childCount ?? 0);
+      return data.travelers.length === expected;
+    },
+    {
+      message: "travelers count must equal adultCount + childCount",
+      path: ["travelers"],
+    },
+  )
+  .refine(
+    (data) => {
+      const adultTravelers = data.travelers.filter(
+        (t) => t.type === "adult",
+      ).length;
+      return adultTravelers === data.adultCount;
+    },
+    {
+      message: "adultCount must match travelers with type 'adult'",
+      path: ["adultCount"],
+    },
+  );
+
+/* ============================================================
+ *  BOOKING — UPDATE STATUS (admin)
+ * ============================================================ */
+
+// Admin সাধারণত এই status গুলোই সেট করবে
+const ADMIN_SETTABLE_STATUSES = [
+  BOOKING_STATUS.CONFIRMED,
+  BOOKING_STATUS.CANCELLED,
+  BOOKING_STATUS.COMPLETED,
+  BOOKING_STATUS.FAILED,
+  BOOKING_STATUS.EXPIRED,
+] as const;
+
+export const updateBookingStatusZodSchema = z
+  .object({
+    status: z.enum(ADMIN_SETTABLE_STATUSES),
+    cancellationReason: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      data.status !== BOOKING_STATUS.CANCELLED || !!data.cancellationReason,
+    {
+      message: "cancellationReason is required when status is CANCELLED",
+      path: ["cancellationReason"],
+    },
+  );
+
+/* ============================================================
+ *  BOOKING — USER CANCEL (optional, পরে লাগবে)
+ * ============================================================ */
+
+export const cancelBookingZodSchema = z.object({
+  cancellationReason: z
+    .string()
+    .min(5, "Please provide a reason (min 5 characters)"),
+});
+
+===== ./src/app/modules/destination/destination.interface.ts =====
+import { Types } from "mongoose";
+
+export interface IDestination {
+  name: string;
+  slug: string;
+  division: Types.ObjectId;
+  thumbnail?: string;
+  images?: string[];
+  description?: string;
+  location?: { type: "Point"; coordinates: [number, number] };
+  isActive: boolean;
+}
+
+export interface ICreateDestinationInput {
+  name: string;
+  division: string;
+  thumbnail?: string;
+  images?: string[];
+  description?: string;
+  location?: { type: "Point"; coordinates: [number, number] };
+  isActive?: boolean;
+}
+
+export type IUpdateDestinationInput = Partial<ICreateDestinationInput>;
+
+===== ./src/app/modules/destination/destination.model.ts =====
+import { model, Schema } from "mongoose";
+import { IDestination } from "./destination.interface";
+
+const destinationSchema = new Schema<IDestination>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    division: {
+      type: Schema.Types.ObjectId,
+      ref: "Division",
+      required: true,
+    },
+    thumbnail: {
+      type: String,
+      trim: true,
+    },
+    images: {
+      type: [String],
+      default: [],
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number],
+        default: undefined,
+      },
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+destinationSchema.index({ location: "2dsphere" });
+destinationSchema.index({ division: 1, isActive: 1 });
+destinationSchema.index({ name: "text", description: "text" });
+
+export const Destination = model<IDestination>(
+  "Destination",
+  destinationSchema,
+);
+
+===== ./src/app/modules/division/division.constant.ts =====
+export const divisionSearchableFields = ["name", "division"];
+
+===== ./src/app/modules/division/division.controller.ts =====
+import { Request, Response } from "express";
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
+import { IDivision } from "./division.interface";
+import { DivisionService } from "./division.service";
+
+/* ============================================================
+ *  CREATE
+ * ============================================================ */
+const createDivision = catchAsync(async (req: Request, res: Response) => {
+  const payload: IDivision = {
+    ...req.body,
+    thumbnail: req.file?.path,
+  };
+  const result = await DivisionService.createDivision(payload);
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Division created successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  GET ALL
+ * ============================================================ */
+const getAllDivisions = catchAsync(async (req: Request, res: Response) => {
+  const result = await DivisionService.getAllDivisions(
+    req.query as Record<string, string>,
+  );
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Divisions retrieved successfully",
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
+/* ============================================================
+ *  GET SINGLE
+ * ============================================================ */
+const getSingleDivision = catchAsync(async (req: Request, res: Response) => {
+  const slug = req.params.slug as string;
+  const result = await DivisionService.getSingleDivision(slug);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Division retrieved successfully",
+    data: result.data,
+  });
+});
+
+/* ============================================================
+ *  UPDATE
+ * ============================================================ */
+const updateDivision = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const payload: Partial<IDivision> = { ...req.body };
+
+  // ✅ file না থাকলে thumbnail field-এ হাত দেবেন না
+  if (req.file?.path) {
+    payload.thumbnail = req.file.path;
+  }
+
+  const result = await DivisionService.updateDivision(id, payload);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Division updated successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  DELETE
+ * ============================================================ */
+const deleteDivision = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await DivisionService.deleteDivision(id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Division deleted successfully",
+    data: result,
+  });
+});
+
+export const DivisionController = {
+  createDivision,
+  getAllDivisions,
+  getSingleDivision,
+  updateDivision,
+  deleteDivision,
+};
+
+===== ./src/app/modules/division/division.interface.ts =====
+/* ============================================================
+ *  DIVISION
+ * ============================================================ */
+
+export interface IDivision {
+  name: string;
+  slug: string;
+  thumbnail?: string;
+  images?: string[];
+  description?: string;
+  districts?: string[];
+  location?: { type: "Point"; coordinates: [number, number] };
+  isActive: boolean;
+}
+
+export interface ICreateDivisionInput {
+  name: string;
+  thumbnail?: string;
+  images?: string[];
+  description?: string;
+  districts?: string[];
+  location?: { type: "Point"; coordinates: [number, number] };
+  isActive?: boolean;
+}
+
+// Update-এ সব field optional
+export type IUpdateDivisionInput = Partial<ICreateDivisionInput>;
+
+===== ./src/app/modules/division/division.model.ts =====
+import { model, Schema } from "mongoose";
+import { IDivision } from "./division.interface";
+
+const divisionSchema = new Schema<IDivision>(
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    thumbnail: {
+      type: String,
+      trim: true,
+    },
+    images: {
+      type: [String],
+      default: [],
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    districts: {
+      type: [String],
+      default: [],
+    },
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        // default: "Point",
+      },
+      coordinates: {
+        type: [Number],
+        // default: undefined,
+      },
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+divisionSchema.index({ location: "2dsphere" });
+
+// Filter
+divisionSchema.index({ isActive: 1 });
+divisionSchema.index({ name: "text", description: "text" });
+
+export const Division = model<IDivision>("Division", divisionSchema);
+
+===== ./src/app/modules/division/division.route.ts =====
+import { Router } from "express";
+import { multerUpload } from "../../config/multer.config";
+import { checkAuth } from "../../middlewares/checkAuth";
+import { validateRequest } from "../../middlewares/validateRequest";
+import { Role } from "../user/user.interface";
+import { DivisionController } from "./division.controller";
+import {
+  createDivisionSchema,
+  updateDivisionSchema,
+} from "./division.validation";
+
+const router = Router();
+
+router.post(
+  "/create",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  multerUpload.single("file"),
+  validateRequest(createDivisionSchema),
+  DivisionController.createDivision,
+);
+
+router.get("/", DivisionController.getAllDivisions);
+
+router.get("/:slug", DivisionController.getSingleDivision);
+
+router.patch(
+  "/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  multerUpload.single("file"),
+  validateRequest(updateDivisionSchema),
+  DivisionController.updateDivision,
+);
+
+router.delete(
+  "/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  DivisionController.deleteDivision,
+);
+
+export const DivisionRoutes = router;
+
+===== ./src/app/modules/division/division.service.ts =====
+import { deleteImageFromCLoudinary } from "../../config/cloudinary.config";
+import { QueryBuilder } from "../../utils/QueryBuilder";
+import { divisionSearchableFields } from "./division.constant";
+import { IDivision } from "./division.interface";
+import { Division } from "./division.model";
+
+/* ============================================================
+ *  HELPER — slug generator
+ * ============================================================ */
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\u0980-\u09FF\s-]/g, "") // Bengali + English + digits
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+/* ============================================================
+ *  CREATE
+ * ============================================================ */
+const createDivision = async (payload: IDivision) => {
+  const existingDivision = await Division.findOne({ name: payload.name });
+  if (existingDivision) {
+    throw new Error("A division with this name already exists.");
+  }
+
+  // slug না দিলে auto-generate
+  if (!payload.slug) {
+    payload.slug = generateSlug(payload.name);
+  }
+
+  // slug uniqueness check
+  const existingSlug = await Division.findOne({ slug: payload.slug });
+  if (existingSlug) {
+    throw new Error("A division with this slug already exists.");
+  }
+
+  const division = await Division.create(payload);
+  return division;
+};
+
+/* ============================================================
+ *  GET ALL (paginated)
+ * ============================================================ */
+const getAllDivisions = async (query: Record<string, string>) => {
+  const queryBuilder = new QueryBuilder(Division.find(), query);
+
+  const divisionsData = queryBuilder
+    .search(divisionSearchableFields)
+    .filter()
+    .sort()
+    .fields()
+    .paginate();
+
+  const [data, meta] = await Promise.all([
+    divisionsData.build(),
+    queryBuilder.getMeta(),
+  ]);
+
+  return { data, meta };
+};
+
+/* ============================================================
+ *  GET SINGLE
+ * ============================================================ */
+const getSingleDivision = async (slug: string) => {
+  const division = await Division.findOne({ slug });
+  if (!division) {
+    throw new Error("Division not found.");
+  }
+  return { data: division };
+};
+
+/* ============================================================
+ *  UPDATE
+ * ============================================================ */
+const updateDivision = async (id: string, payload: Partial<IDivision>) => {
+  const existingDivision = await Division.findById(id);
+  if (!existingDivision) {
+    throw new Error("Division not found.");
+  }
+
+  // ✅ FIX: name থাকলে এবং সত্যিই বদলালে তবেই duplicate check
+  if (payload.name && payload.name !== existingDivision.name) {
+    const duplicateDivision = await Division.findOne({
+      name: payload.name,
+      _id: { $ne: id },
+    });
+    if (duplicateDivision) {
+      throw new Error("A division with this name already exists.");
+    }
+
+    // name বদলালে slug-ও regenerate (user explicitly slug না দিলে)
+    if (!payload.slug) {
+      payload.slug = generateSlug(payload.name);
+    }
+  }
+
+  // ✅ slug explicitly দিলে uniqueness check
+  if (payload.slug && payload.slug !== existingDivision.slug) {
+    const duplicateSlug = await Division.findOne({
+      slug: payload.slug,
+      _id: { $ne: id },
+    });
+    if (duplicateSlug) {
+      throw new Error("A division with this slug already exists.");
+    }
+  }
+
+  const updatedDivision = await Division.findByIdAndUpdate(id, payload, {
+    new: true,
+    runValidators: true,
+  });
+
+  // নতুন thumbnail এলে পুরনোটা Cloudinary থেকে মুছুন
+  if (payload.thumbnail && existingDivision.thumbnail) {
+    await deleteImageFromCLoudinary(existingDivision.thumbnail);
+  }
+
+  return updatedDivision;
+};
+
+/* ============================================================
+ *  DELETE
+ * ============================================================ */
+const deleteDivision = async (id: string) => {
+  const division = await Division.findById(id);
+  if (!division) {
+    throw new Error("Division not found.");
+  }
+
+  // TODO: referential integrity — Destination/Tour এই division ব্যবহার করছে কি না চেক করুন
+  // const hasDestinations = await Destination.exists({ division: id });
+  // if (hasDestinations) {
+  //   throw new Error("Cannot delete division with existing destinations.");
+  // }
+
+  await Division.findByIdAndDelete(id);
+
+  // ✅ Cloudinary থেকে thumbnail মুছুন
+  if (division.thumbnail) {
+    await deleteImageFromCLoudinary(division.thumbnail);
+  }
+
+  return null;
+};
+
+export const DivisionService = {
+  createDivision,
+  getAllDivisions,
+  getSingleDivision,
+  updateDivision,
+  deleteDivision,
+};
+
+===== ./src/app/modules/division/division.validation.ts =====
+import { z } from "zod";
+
+/* ============================================================
+ *  DIVISION — CREATE
+ * ============================================================ */
+
+export const createDivisionSchema = z.object({
+  name: z.string().min(1, "Name is required").trim(),
+  slug: z.string().optional(), // না দিলে server auto-generate করবে
+  thumbnail: z.string().optional(),
+  images: z.array(z.string()).optional(),
+  description: z.string().optional(),
+  districts: z.array(z.string()).optional(),
+  location: z
+    .object({
+      type: z.literal("Point"),
+      coordinates: z.tuple([z.number(), z.number()]), // [lng, lat]
+    })
+    .optional(),
+  isActive: z.boolean().optional(),
+});
+
+/* ============================================================
+ *  DIVISION — UPDATE
+ * ============================================================ */
+
+export const updateDivisionSchema = createDivisionSchema.partial();
+
+===== ./src/app/modules/payment/payment.controller.ts =====
+import { Request, Response } from "express";
+import { envVars } from "../../config/env";
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
+import { SSLService } from "../sslCommerz/sslCommerz.service";
+import { PaymentService } from "./payment.service";
+
+const initPayment = catchAsync(async (req: Request, res: Response) => {
+  const bookingId = req.params.bookingId;
+  const result = await PaymentService.initPayment(bookingId as string);
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Payment done successfully",
+    data: result,
+  });
+});
+const successPayment = catchAsync(async (req: Request, res: Response) => {
+  const query = req.query;
+  const result = await PaymentService.successPayment(
+    query as Record<string, string>,
+  );
+
+  if (result.success) {
+    res.redirect(
+      `${envVars.SSL.SSL_SUCCESS_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
+    );
+  }
+});
+const failPayment = catchAsync(async (req: Request, res: Response) => {
+  const query = req.query;
+  const result = await PaymentService.failPayment(
+    query as Record<string, string>,
+  );
+
+  if (!result.success) {
+    res.redirect(
+      `${envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
+    );
+  }
+});
+const cancelPayment = catchAsync(async (req: Request, res: Response) => {
+  const query = req.query;
+  const result = await PaymentService.cancelPayment(
+    query as Record<string, string>,
+  );
+
+  if (!result.success) {
+    res.redirect(
+      `${envVars.SSL.SSL_CANCEL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
+    );
+  }
+});
+
+const getInvoiceDownloadUrl = catchAsync(
+  async (req: Request, res: Response) => {
+    const { paymentId } = req.params as any;
+    const result = await PaymentService.getInvoiceDownloadUrl(paymentId);
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Invoice download URL retrieved successfully",
+      data: result,
+    });
+  },
+);
+const validatePayment = catchAsync(async (req: Request, res: Response) => {
+  console.log("sslcommerz ipn url body", req.body);
+  await SSLService.validatePayment(req.body);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Payment Validated Successfully",
+    data: null,
+  });
+});
+
+export const PaymentController = {
+  initPayment,
+  successPayment,
+  failPayment,
+  cancelPayment,
+  getInvoiceDownloadUrl,
+  validatePayment,
+};
+
+===== ./src/app/modules/payment/payment.interface.ts =====
+import { Types } from "mongoose";
+
+export enum PAYMENT_STATUS {
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  PAID = "PAID",
+  FAILED = "FAILED",
+  CANCELLED = "CANCELLED",
+  REFUNDED = "REFUNDED",
+}
+
+export enum PAYMENT_GATEWAY {
+  SSLCOMMERZ = "sslcommerz",
+  BKASH = "bkash",
+  NAGAD = "nagad",
+  STRIPE = "stripe",
+  MANUAL = "manual",
+}
+
+export interface IPayment {
+  booking: Types.ObjectId;
+  user: Types.ObjectId; // denormalized for quick lookup
+  gateway: PAYMENT_GATEWAY;
+  transactionId?: string; // optional initially, unique when set
+  amount: number;
+  currency: string; // default 'BDT'
+  status: PAYMENT_STATUS;
+  paymentGatewayData?: Record<string, unknown>;
+  failureReason?: string;
+  invoiceUrl?: string;
+  paidAt?: Date;
+  verifiedAt?: Date;
+  refundedAt?: Date;
+  refundAmount?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+===== ./src/app/modules/payment/payment.model.ts =====
+import { model, Schema } from "mongoose";
+import { IPayment, PAYMENT_GATEWAY, PAYMENT_STATUS } from "./payment.interface";
+
+/* ============================================================
+ *  PAYMENT SCHEMA
+ * ============================================================ */
+
+const paymentSchema = new Schema<IPayment>(
+  {
+    booking: {
+      type: Schema.Types.ObjectId,
+      ref: "Booking",
+      required: true,
+    },
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    gateway: {
+      type: String,
+      enum: Object.values(PAYMENT_GATEWAY),
+      required: true,
+    },
+    transactionId: {
+      type: String,
+      trim: true,
+      // required নয় — গেটওয়ে redirect-এর আগে থাকে না
+    },
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    currency: {
+      type: String,
+      default: "BDT",
+      uppercase: true,
+      trim: true,
+    },
+    status: {
+      type: String,
+      enum: Object.values(PAYMENT_STATUS),
+      default: PAYMENT_STATUS.PENDING,
+    },
+    paymentGatewayData: {
+      type: Schema.Types.Mixed,
+    },
+    failureReason: {
+      type: String,
+      trim: true,
+    },
+    invoiceUrl: {
+      type: String,
+      trim: true,
+    },
+    paidAt: {
+      type: Date,
+    },
+    verifiedAt: {
+      type: Date,
+    },
+    refundedAt: {
+      type: Date,
+    },
+    refundAmount: {
+      type: Number,
+      min: 0,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+/* ============================================================
+ *  INDEXES
+ * ============================================================ */
+
+paymentSchema.index({ transactionId: 1 }, { unique: true, sparse: true });
+paymentSchema.index({ booking: 1, status: 1 });
+paymentSchema.index({ user: 1, createdAt: -1 });
+paymentSchema.index({ status: 1, createdAt: -1 });
+
+/* ============================================================
+ *  HOOKS
+ * ============================================================ */
+
+// PAID/REFUNDED হলে timestamp সেট
+paymentSchema.pre("save", function () {
+  if (
+    this.isModified("status") &&
+    this.status === PAYMENT_STATUS.PAID &&
+    !this.paidAt
+  ) {
+    this.paidAt = new Date();
+  }
+  if (
+    this.isModified("status") &&
+    this.status === PAYMENT_STATUS.REFUNDED &&
+    !this.refundedAt
+  ) {
+    this.refundedAt = new Date();
+  }
+});
+
+/* ============================================================
+ *  MODEL
+ * ============================================================ */
+
+export const Payment = model<IPayment>("Payment", paymentSchema);
+
+===== ./src/app/modules/payment/payment.route.ts =====
+import express from "express";
+import { checkAuth } from "../../middlewares/checkAuth";
+import { Role } from "../user/user.interface";
+import { PaymentController } from "./payment.controller";
+
+const router = express.Router();
+
+router.post("/init-payment/:bookingId", PaymentController.initPayment);
+router.post("/success", PaymentController.successPayment);
+router.post("/fail", PaymentController.failPayment);
+router.post("/cancel", PaymentController.cancelPayment);
+router.get(
+  "/invoice/:paymentId",
+  checkAuth(...Object.values(Role)),
+  PaymentController.getInvoiceDownloadUrl,
+);
+router.post("/validate-payment", PaymentController.validatePayment);
+export const PaymentRoutes = router;
+
+===== ./src/app/modules/payment/payment.service.ts =====
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import httpStatus from "http-status-codes";
+import { uploadBufferToCloudinary } from "../../config/cloudinary.config";
+import AppError from "../../errorHelpers/AppError";
+
+import { generatePdf, IInvoiceData } from "../../utils/invoice";
+import { sendEmail } from "../../utils/sendEmail";
+import { BOOKING_STATUS } from "../booking/booking.interface";
+import { Booking } from "../booking/booking.model";
+import { ISSLCommerz } from "../sslCommerz/sslCommerz.interface";
+import { SSLService } from "../sslCommerz/sslCommerz.service";
+import { IUser } from "../user/user.interface";
+import { PAYMENT_STATUS } from "./payment.interface";
+import { Payment } from "./payment.model";
+
+const initPayment = async (bookingId: string) => {
+  const payment = await Payment.findOne({ booking: bookingId });
+
+  if (!payment) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "Payment Not Found. You have not booked this tour",
+    );
+  }
+
+  const booking = await Booking.findById(payment.booking);
+
+  const userAddress = (booking?.user as any).address;
+  const userEmail = (booking?.user as any).email;
+  const userPhoneNumber = (booking?.user as any).phone;
+  const userName = (booking?.user as any).name;
+
+  const sslPayload: ISSLCommerz = {
+    address: userAddress,
+    email: userEmail,
+    phoneNumber: userPhoneNumber,
+    name: userName,
+    amount: payment.amount,
+    transactionId: payment.transactionId,
+  };
+
+  const sslPayment = await SSLService.sslPaymentInit(sslPayload);
+
+  return {
+    paymentUrl: sslPayment.GatewayPageURL,
+  };
+};
+const successPayment = async (query: Record<string, string>) => {
+  // Update Booking Status to COnfirm
+  // Update Payment Status to PAID
+
+  const session = await Booking.startSession();
+  session.startTransaction();
+
+  try {
+    const updatedPayment = await Payment.findOneAndUpdate(
+      { transactionId: query.transactionId },
+      {
+        status: PAYMENT_STATUS.PAID,
+      },
+      { new: true, runValidators: true, session: session },
+    );
+
+    if (!updatedPayment) {
+      throw new AppError(401, "Payment not found");
+    }
+
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      updatedPayment?.booking,
+      { status: BOOKING_STATUS.COMPLETED },
+      { new: true, runValidators: true, session },
+    )
+      .populate({
+        path: "tourDeparture",
+        populate: {
+          path: "tour",
+          select: "title slug",
+        },
+      })
+      .populate("user", "name email");
+
+    if (!updatedBooking) {
+      throw new AppError(401, "Booking not found");
+    }
+
+    const invoiceData: IInvoiceData = {
+      bookingDate: updatedBooking.createdAt as Date,
+      guestCount: updatedBooking.guestCount,
+      totalAmount: updatedPayment.amount,
+      tourTitle: (updatedBooking?.tourDeparture as any)?.tour?.title ?? "Tour",
+      transactionId: updatedPayment.transactionId,
+      userName: (updatedBooking.user as unknown as IUser).name,
+    };
+
+    const pdfBuffer = await generatePdf(invoiceData);
+
+    const cloudinaryResult = await uploadBufferToCloudinary(
+      pdfBuffer,
+      "invoice",
+    );
+
+    if (!cloudinaryResult) {
+      throw new AppError(401, "Error uploading pdf");
+    }
+
+    await Payment.findByIdAndUpdate(
+      updatedPayment._id,
+      { invoiceUrl: cloudinaryResult.secure_url },
+      { runValidators: true, session },
+    );
+
+    await sendEmail({
+      to: (updatedBooking.user as unknown as IUser).email,
+      subject: "Your Booking Invoice",
+      templateName: "invoice",
+      templateData: invoiceData,
+      attachments: [
+        {
+          filename: "invoice.pdf",
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+
+    await session.commitTransaction(); //transaction
+    session.endSession();
+    return { success: true, message: "Payment Completed Successfully" };
+  } catch (error) {
+    await session.abortTransaction(); // rollback
+    session.endSession();
+    // throw new AppError(httpStatus.BAD_REQUEST, error) ❌❌
+    throw error;
+  }
+};
+const failPayment = async (query: Record<string, string>) => {
+  // Update Booking Status to FAIL
+  // Update Payment Status to FAIL
+
+  const session = await Booking.startSession();
+  session.startTransaction();
+
+  try {
+    const updatedPayment = await Payment.findOneAndUpdate(
+      { transactionId: query.transactionId },
+      {
+        status: PAYMENT_STATUS.FAILED,
+      },
+      { new: true, runValidators: true, session: session },
+    );
+
+    await Booking.findByIdAndUpdate(
+      updatedPayment?.booking,
+      { status: BOOKING_STATUS.FAILED },
+      { runValidators: true, session },
+    );
+
+    await session.commitTransaction(); //transaction
+    session.endSession();
+    return { success: false, message: "Payment Failed" };
+  } catch (error) {
+    await session.abortTransaction(); // rollback
+    session.endSession();
+    // throw new AppError(httpStatus.BAD_REQUEST, error) ❌❌
+    throw error;
+  }
+};
+const cancelPayment = async (query: Record<string, string>) => {
+  // Update Booking Status to CANCEL
+  // Update Payment Status to CANCEL
+
+  const session = await Booking.startSession();
+  session.startTransaction();
+
+  try {
+    const updatedPayment = await Payment.findOneAndUpdate(
+      { transactionId: query.transactionId },
+      {
+        status: PAYMENT_STATUS.CANCELLED,
+      },
+      { runValidators: true, session: session },
+    );
+
+    await Booking.findByIdAndUpdate(
+      updatedPayment?.booking,
+      { status: BOOKING_STATUS.COMPLETED },
+      { runValidators: true, session },
+    );
+
+    await session.commitTransaction(); //transaction
+    session.endSession();
+    return { success: false, message: "Payment Cancelled" };
+  } catch (error) {
+    await session.abortTransaction(); // rollback
+    session.endSession();
+    // throw new AppError(httpStatus.BAD_REQUEST, error) ❌❌
+    throw error;
+  }
+};
+
+const getInvoiceDownloadUrl = async (paymentId: string) => {
+  const payment = await Payment.findById(paymentId).select("invoiceUrl");
+
+  if (!payment) {
+    throw new AppError(401, "Payment not found");
+  }
+
+  if (!payment.invoiceUrl) {
+    throw new AppError(401, "No invoice found");
+  }
+
+  return payment.invoiceUrl;
+};
+
+export const PaymentService = {
+  initPayment,
+  successPayment,
+  failPayment,
+  cancelPayment,
+  getInvoiceDownloadUrl,
+};
+
+===== ./src/app/modules/sslCommerz/sslCommerz.interface.ts =====
+export interface ISSLCommerz {
+  amount: number;
+  transactionId: string;
+  name: string;
+  email: string;
+  phoneNumber: string;
+  address: string;
+}
+
+===== ./src/app/modules/sslCommerz/sslCommerz.service.ts =====
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import axios from "axios";
+import httpStatus from "http-status-codes";
+import { envVars } from "../../config/env";
+import AppError from "../../errorHelpers/AppError";
+
+import { Payment } from "../payment/payment.model";
+import { ISSLCommerz } from "./sslCommerz.interface";
+
+const sslPaymentInit = async (payload: ISSLCommerz) => {
+  try {
+    const data = {
+      store_id: envVars.SSL.STORE_ID,
+      store_passwd: envVars.SSL.STORE_PASS,
+      total_amount: payload.amount,
+      currency: "BDT",
+      tran_id: payload.transactionId,
+      success_url: `${envVars.SSL.SSL_SUCCESS_BACKEND_URL}?transactionId=${payload.transactionId}&amount=${payload.amount}&status=success`,
+      fail_url: `${envVars.SSL.SSL_FAIL_BACKEND_URL}?transactionId=${payload.transactionId}&amount=${payload.amount}&status=fail`,
+      cancel_url: `${envVars.SSL.SSL_CANCEL_BACKEND_URL}?transactionId=${payload.transactionId}&amount=${payload.amount}&status=cancel`,
+      ipn_url: envVars.SSL.SSL_IPN_URL,
+      shipping_method: "N/A",
+      product_name: "Tour",
+      product_category: "Service",
+      product_profile: "general",
+      cus_name: payload.name,
+      cus_email: payload.email,
+      cus_add1: payload.address,
+      cus_add2: "N/A",
+      cus_city: "Dhaka",
+      cus_state: "Dhaka",
+      cus_postcode: "1000",
+      cus_country: "Bangladesh",
+      cus_phone: payload.phoneNumber,
+      cus_fax: "01711111111",
+      ship_name: "N/A",
+      ship_add1: "N/A",
+      ship_add2: "N/A",
+      ship_city: "N/A",
+      ship_state: "N/A",
+      ship_postcode: 1000,
+      ship_country: "N/A",
+    };
+
+    const response = await axios({
+      method: "POST",
+      url: envVars.SSL.SSL_PAYMENT_API,
+      data: data,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+
+    return response.data;
+  } catch (error: any) {
+    console.log("Payment Error Occured", error);
+    throw new AppError(httpStatus.BAD_REQUEST, error.message);
+  }
+};
+
+const validatePayment = async (payload: any) => {
+  try {
+    const response = await axios({
+      method: "GET",
+      url: `${envVars.SSL.SSL_VALIDATION_API}?val_id=${payload.val_id}&store_id=${envVars.SSL.STORE_ID}&store_passwd=${envVars.SSL.STORE_PASS}`,
+    });
+
+    console.log("sslcomeerz validate api response", response.data);
+
+    await Payment.updateOne(
+      { transactionId: payload.tran_id },
+      { paymentGatewayData: response.data },
+      { runValidators: true },
+    );
+  } catch (error: any) {
+    console.log(error);
+    throw new AppError(401, `Payment Validation Error, ${error.message}`);
+  }
+};
+
+export const SSLService = {
+  sslPaymentInit,
+  validatePayment,
+};
+
+===== ./src/app/modules/tour/tour.constant.ts =====
+export const tourSearchableFields = ["title", "description", "location"];
+export const tourTypeSearchableFields = ["name"];
+
+===== ./src/app/modules/tour/tour.controller.ts =====
+import { Request, Response } from "express";
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
+import { ITour, ITourType } from "./tour.interface";
+import { TourService } from "./tour.service";
+
+/* ============================================================
+ *  TOUR — CREATE
+ * ============================================================ */
+const createTour = catchAsync(async (req: Request, res: Response) => {
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  const payload: ITour = {
+    ...req.body,
+    images: files.map((file) => file.path),
+  };
+  const result = await TourService.createTour(payload);
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Tour created successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  TOUR — GET ALL
+ * ============================================================ */
+const getAllTours = catchAsync(async (req: Request, res: Response) => {
+  const result = await TourService.getAllTours(
+    req.query as Record<string, string>,
+  );
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tours retrieved successfully",
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
+/* ============================================================
+ *  TOUR — GET SINGLE
+ * ============================================================ */
+const getSingleTour = catchAsync(async (req: Request, res: Response) => {
+  const slug = req.params.slug as string;
+  const result = await TourService.getSingleTour(slug);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour retrieved successfully",
+    data: result, // ✅ result এখন সরাসরি tour object
+  });
+});
+
+/* ============================================================
+ *  TOUR — UPDATE
+ * ============================================================ */
+const updateTour = catchAsync(async (req: Request, res: Response) => {
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+
+  // ✅ শুধু file থাকলে images set করুন
+  const payload: Partial<ITour> & { deleteImages?: string[] } = {
+    ...req.body,
+  };
+
+  if (files.length > 0) {
+    payload.images = files.map((file) => file.path);
+  }
+
+  // ✅ deleteImages array হিসেবে আসছে কি না নিশ্চিত করুন
+  if (req.body.deleteImages) {
+    payload.deleteImages = Array.isArray(req.body.deleteImages)
+      ? req.body.deleteImages
+      : [req.body.deleteImages];
+  }
+
+  const result = await TourService.updateTour(req.params.id as string, payload);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour updated successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  TOUR — DELETE
+ * ============================================================ */
+const deleteTour = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await TourService.deleteTour(id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour deleted successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  TOUR TYPE — CREATE
+ * ============================================================ */
+const createTourType = catchAsync(async (req: Request, res: Response) => {
+  const payload: ITourType = req.body; // ✅ পুরো object পাঠান
+  const result = await TourService.createTourType(payload);
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Tour type created successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  TOUR TYPE — GET ALL
+ * ============================================================ */
+const getAllTourTypes = catchAsync(async (req: Request, res: Response) => {
+  const result = await TourService.getAllTourTypes(
+    req.query as Record<string, string>,
+  );
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour types retrieved successfully",
+    data: result.data, // ✅ result.data
+    meta: result.meta, // ✅ meta আলাদা
+  });
+});
+
+/* ============================================================
+ *  TOUR TYPE — GET SINGLE
+ * ============================================================ */
+const getSingleTourType = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await TourService.getSingleTourType(id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour type retrieved successfully",
+    data: result, // ✅ result এখন সরাসরি tourType object
+  });
+});
+
+/* ============================================================
+ *  TOUR TYPE — UPDATE
+ * ============================================================ */
+const updateTourType = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const payload: Partial<ITourType> = req.body; // ✅ পুরো object
+  const result = await TourService.updateTourType(id, payload);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour type updated successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  TOUR TYPE — DELETE
+ * ============================================================ */
+const deleteTourType = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await TourService.deleteTourType(id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour type deleted successfully",
+    data: result,
+  });
+});
+
+export const TourController = {
+  createTour,
+  createTourType,
+  getAllTourTypes,
+  getSingleTourType,
+  deleteTourType,
+  updateTourType,
+  getAllTours,
+  getSingleTour,
+  updateTour,
+  deleteTour,
+};
+
+===== ./src/app/modules/tour/tour.interface.ts =====
+import { Types } from "mongoose";
+
+/* ============================================================
+ *  TOUR
+ * ============================================================ */
+export interface ITour {
+  title: string;
+  slug: string;
+  description?: string;
+  coverImage?: string;
+  images: string[];
+  destinations: Types.ObjectId[];
+  primaryDestination?: Types.ObjectId;
+  tourType: Types.ObjectId;
+  category?: "group" | "family" | "honeymoon" | "adventure" | "corporate";
+  difficulty?: "easy" | "moderate" | "hard";
+  duration: { days: number; nights: number };
+  price: {
+    adult: number;
+    child?: number;
+    discountPercent?: number;
+  };
+  included: string[];
+  excluded: string[];
+  amenities: string[];
+  tourPlan: {
+    day: number;
+    title: string;
+    description: string;
+    meals?: string[];
+    accommodation?: string;
+  }[];
+  minGroupSize?: number;
+  maxGuest?: number;
+  minAge?: number;
+  cancellationPolicy?: string;
+  rating: number; // default 0, review থেকে আপডেট হবে
+  totalReviews: number; // default 0
+  status: "draft" | "published" | "archived"; // default 'draft'
+}
+
+export interface ICreateTourInput {
+  title: string;
+  description?: string;
+  coverImage?: string;
+  images?: string[];
+  destinations: string[]; // ObjectId string হিসেবে আসবে
+  primaryDestination?: string;
+  tourType: string;
+  category?: ITour["category"];
+  difficulty?: ITour["difficulty"];
+  duration: { days: number; nights: number };
+  price: {
+    adult: number;
+    child?: number;
+    discountPercent?: number;
+  };
+  included?: string[];
+  excluded?: string[];
+  amenities?: string[];
+  tourPlan?: ITour["tourPlan"];
+  minGroupSize?: number;
+  maxGuest?: number;
+  minAge?: number;
+  cancellationPolicy?: string;
+}
+
+export type IUpdateTourInput = Partial<ICreateTourInput>;
+
+/* ============================================================
+ *  TOUR TYPE
+ * ============================================================ */
+
+export interface ITourType {
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  isActive: boolean; // default true
+}
+
+export interface ICreateTourTypeInput {
+  name: string;
+  description?: string;
+  icon?: string;
+  isActive?: boolean; // optional, default true
+}
+
+export type IUpdateTourTypeInput = Partial<ICreateTourTypeInput>;
+
+===== ./src/app/modules/tour/tour.model.ts =====
+import { model, Schema } from "mongoose";
+import { ITour, ITourType } from "./tour.interface";
+
+/* ============================================================
+ *  TOUR TYPE SCHEMA
+ * ============================================================ */
+
+const tourTypeSchema = new Schema<ITourType>(
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    icon: {
+      type: String,
+      trim: true,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+/* ============================================================
+ *  TOUR SCHEMA
+ * ============================================================ */
+
+const tourPlanSchema = new Schema(
+  {
+    day: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    meals: {
+      type: [String],
+      default: [],
+    },
+    accommodation: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
+const tourSchema = new Schema<ITour>(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    coverImage: {
+      type: String,
+      trim: true,
+    },
+    images: {
+      type: [String],
+      default: [],
+    },
+    destinations: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Destination",
+        required: true,
+      },
+    ],
+    primaryDestination: {
+      type: Schema.Types.ObjectId,
+      ref: "Destination",
+    },
+    tourType: {
+      type: Schema.Types.ObjectId,
+      ref: "TourType",
+      required: true,
+    },
+    category: {
+      type: String,
+      enum: ["group", "family", "honeymoon", "adventure", "corporate"],
+    },
+    difficulty: {
+      type: String,
+      enum: ["easy", "moderate", "hard"],
+    },
+    duration: {
+      days: {
+        type: Number,
+        required: true,
+        min: 1,
+      },
+      nights: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+    },
+    price: {
+      adult: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+      child: {
+        type: Number,
+        min: 0,
+      },
+      discountPercent: {
+        type: Number,
+        min: 0,
+        max: 100,
+        default: 0,
+      },
+    },
+    included: {
+      type: [String],
+      default: [],
+    },
+    excluded: {
+      type: [String],
+      default: [],
+    },
+    amenities: {
+      type: [String],
+      default: [],
+    },
+    tourPlan: {
+      type: [tourPlanSchema],
+      default: [],
+    },
+    minGroupSize: {
+      type: Number,
+      min: 1,
+    },
+    maxGuest: {
+      type: Number,
+      min: 1,
+    },
+    minAge: {
+      type: Number,
+      min: 0,
+    },
+    cancellationPolicy: {
+      type: String,
+      trim: true,
+    },
+    rating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    totalReviews: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    status: {
+      type: String,
+      enum: ["draft", "published", "archived"],
+      default: "draft",
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+/* ============================================================
+ *  INDEXES
+ * ============================================================ */
+
+// Text search (title + description)
+tourSchema.index({ title: "text", description: "text" });
+
+// Filter + sort
+tourSchema.index({ tourType: 1, status: 1 });
+tourSchema.index({ destinations: 1 });
+tourSchema.index({ primaryDestination: 1 });
+tourSchema.index({ "price.adult": 1 });
+tourSchema.index({ rating: -1 });
+tourSchema.index({ createdAt: -1 });
+
+// tourTypeSchema-এর জন্য
+tourTypeSchema.index({ isActive: 1 });
+
+/* ============================================================
+ *  MODELS
+ * ============================================================ */
+
+export const TourType = model<ITourType>("TourType", tourTypeSchema);
+export const Tour = model<ITour>("Tour", tourSchema);
+
+===== ./src/app/modules/tour/tour.route.ts =====
+import express from "express";
+import { multerUpload } from "../../config/multer.config";
+import { checkAuth } from "../../middlewares/checkAuth";
+import { validateRequest } from "../../middlewares/validateRequest";
+import { Role } from "../user/user.interface";
+import { TourController } from "./tour.controller";
+import {
+  createTourTypeZodSchema,
+  createTourZodSchema,
+  updateTourTypeZodSchema,
+  updateTourZodSchema,
+} from "./tour.validation";
+
+const router = express.Router();
+
+/* ------------------ TOUR TYPE ROUTES -------------------- */
+router.get("/tour-types", TourController.getAllTourTypes);
+
+router.post(
+  "/create-tour-type",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  validateRequest(createTourTypeZodSchema),
+  TourController.createTourType,
+);
+
+router.get("/tour-types/:id", TourController.getSingleTourType);
+
+router.patch(
+  "/tour-types/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  validateRequest(updateTourTypeZodSchema), // ✅ update schema
+  TourController.updateTourType,
+);
+
+router.delete(
+  "/tour-types/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  TourController.deleteTourType,
+);
+
+/* --------------------- TOUR ROUTES ---------------------- */
+router.get("/", TourController.getAllTours);
+
+router.post(
+  "/create",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  multerUpload.array("files"),
+  validateRequest(createTourZodSchema),
+  TourController.createTour,
+);
+
+router.get("/:slug", TourController.getSingleTour);
+
+router.patch(
+  "/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  multerUpload.array("files"),
+  validateRequest(updateTourZodSchema),
+  TourController.updateTour,
+);
+
+router.delete(
+  "/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  TourController.deleteTour,
+);
+
+export const TourRoutes = router;
+
+===== ./src/app/modules/tour/tour.service.ts =====
+import { deleteImageFromCLoudinary } from "../../config/cloudinary.config";
+import { QueryBuilder } from "../../utils/QueryBuilder";
+import { Destination } from "../destination/destination.model";
+import {
+  tourSearchableFields,
+  tourTypeSearchableFields,
+} from "./tour.constant";
+import { ITour, ITourType } from "./tour.interface";
+import { Tour, TourType } from "./tour.model";
+
+type UpdateTourPayload = Partial<ITour> & {
+  deleteImages?: string[];
+};
+
+/* ============================================================
+ *  HELPER — slug generator
+ * ============================================================ */
+const generateSlug = (text: string): string => {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\u0980-\u09FF\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+/* ============================================================
+ *  TOUR — CREATE
+ * ============================================================ */
+const createTour = async (payload: ITour) => {
+  // slug auto-generate
+  if (!payload.slug) {
+    payload.slug = generateSlug(payload.title);
+  }
+
+  const existingTour = await Tour.findOne({
+    $or: [{ title: payload.title }, { slug: payload.slug }],
+  });
+  if (existingTour) {
+    throw new Error("A tour with this title or slug already exists.");
+  }
+
+  // ✅ referential integrity — destinations exist করে কি না
+  if (payload.destinations?.length) {
+    const foundDestinations = await Destination.countDocuments({
+      _id: { $in: payload.destinations },
+    });
+    if (foundDestinations !== payload.destinations.length) {
+      throw new Error("One or more destinations not found.");
+    }
+  }
+
+  // ✅ tourType exist করে কি না
+  if (payload.tourType) {
+    const foundType = await TourType.findById(payload.tourType);
+    if (!foundType) {
+      throw new Error("Tour type not found.");
+    }
+  }
+
+  return await Tour.create(payload);
+};
+
+/* ============================================================
+ *  TOUR — GET ALL
+ * ============================================================ */
+const getAllTours = async (query: Record<string, string>) => {
+  const queryBuilder = new QueryBuilder(Tour.find(), query);
+
+  const tours = queryBuilder
+    .search(tourSearchableFields)
+    .filter()
+    .sort()
+    .fields()
+    .paginate();
+
+  const [data, meta] = await Promise.all([
+    tours
+      .build()
+      .populate("destinations", "name slug thumbnail")
+      .populate("tourType", "name slug icon"),
+    queryBuilder.getMeta(),
+  ]);
+
+  return { data, meta };
+};
+
+/* ============================================================
+ *  TOUR — GET SINGLE
+ * ============================================================ */
+const getSingleTour = async (slug: string) => {
+  const tour = await Tour.findOne({ slug })
+    .populate("destinations", "name slug thumbnail description")
+    .populate("tourType", "name slug icon");
+
+  if (!tour) {
+    throw new Error("Tour not found.");
+  }
+
+  return tour; // ✅ wrapper বাদ
+};
+
+/* ============================================================
+ *  TOUR — UPDATE
+ * ============================================================ */
+const updateTour = async (id: string, payload: UpdateTourPayload) => {
+  const existingTour = await Tour.findById(id);
+  if (!existingTour) {
+    throw new Error("Tour not found.");
+  }
+
+  const { deleteImages = [], images: newImages, ...updateData } = payload;
+
+  const finalUpdateData: Partial<ITour> = { ...updateData };
+
+  // ✅ title বদলালে slug regenerate + duplicate check
+  if (updateData.title && updateData.title !== existingTour.title) {
+    const newSlug = updateData.slug || generateSlug(updateData.title);
+    const duplicate = await Tour.findOne({
+      _id: { $ne: id },
+      $or: [{ title: updateData.title }, { slug: newSlug }],
+    });
+    if (duplicate) {
+      throw new Error("A tour with this title or slug already exists.");
+    }
+    finalUpdateData.slug = newSlug;
+  }
+
+  // ✅ destinations validate
+  if (updateData.destinations?.length) {
+    const found = await Destination.countDocuments({
+      _id: { $in: updateData.destinations },
+    });
+    if (found !== updateData.destinations.length) {
+      throw new Error("One or more destinations not found.");
+    }
+  }
+
+  // ✅ tourType validate
+  if (updateData.tourType) {
+    const foundType = await TourType.findById(updateData.tourType);
+    if (!foundType) {
+      throw new Error("Tour type not found.");
+    }
+  }
+
+  // ✅ images merge logic
+  if (newImages !== undefined || deleteImages.length > 0) {
+    const deletedSet = new Set(deleteImages);
+    const remaining = (existingTour.images ?? []).filter(
+      (url) => !deletedSet.has(url),
+    );
+    const uploaded = (newImages ?? []).filter((url) => !deletedSet.has(url));
+    finalUpdateData.images = [...remaining, ...uploaded];
+  }
+
+  const updatedTour = await Tour.findByIdAndUpdate(id, finalUpdateData, {
+    new: true,
+    runValidators: true,
+  });
+
+  // Cloudinary cleanup — update সফল হলে
+  if (deleteImages.length > 0) {
+    await Promise.all(
+      deleteImages.map((url) => deleteImageFromCLoudinary(url)),
+    );
+  }
+
+  return updatedTour;
+};
+
+/* ============================================================
+ *  TOUR — DELETE
+ * ============================================================ */
+const deleteTour = async (id: string) => {
+  const tour = await Tour.findById(id);
+  if (!tour) {
+    throw new Error("Tour not found.");
+  }
+
+  // TODO: referential integrity — কোনো booking থাকলে delete আটকান
+  // const hasBookings = await Booking.exists({ tour: id });
+  // if (hasBookings) throw new Error("Cannot delete tour with existing bookings.");
+
+  await Tour.findByIdAndDelete(id);
+
+  // ✅ Cloudinary cleanup
+  if (tour.images?.length) {
+    await Promise.all(tour.images.map((url) => deleteImageFromCLoudinary(url)));
+  }
+
+  return null;
+};
+
+/* ============================================================
+ *  TOUR TYPE — CREATE
+ * ============================================================ */
+const createTourType = async (payload: ITourType) => {
+  // slug auto-generate
+  if (!payload.slug) {
+    payload.slug = generateSlug(payload.name);
+  }
+
+  const existingTourType = await TourType.findOne({
+    $or: [{ name: payload.name }, { slug: payload.slug }],
+  });
+  if (existingTourType) {
+    throw new Error("A tour type with this name or slug already exists.");
+  }
+
+  return await TourType.create(payload);
+};
+
+/* ============================================================
+ *  TOUR TYPE — GET ALL
+ * ============================================================ */
+const getAllTourTypes = async (query: Record<string, string>) => {
+  const queryBuilder = new QueryBuilder(TourType.find(), query);
+
+  const tourTypes = queryBuilder
+    .search(tourTypeSearchableFields)
+    .filter()
+    .sort()
+    .fields()
+    .paginate();
+
+  const [data, meta] = await Promise.all([
+    tourTypes.build(),
+    queryBuilder.getMeta(),
+  ]);
+
+  return { data, meta };
+};
+
+/* ============================================================
+ *  TOUR TYPE — GET SINGLE
+ * ============================================================ */
+const getSingleTourType = async (id: string) => {
+  const tourType = await TourType.findById(id);
+  if (!tourType) {
+    throw new Error("Tour type not found.");
+  }
+  return tourType; // ✅ wrapper বাদ
+};
+
+/* ============================================================
+ *  TOUR TYPE — UPDATE
+ * ============================================================ */
+const updateTourType = async (id: string, payload: Partial<ITourType>) => {
+  const existingTourType = await TourType.findById(id);
+  if (!existingTourType) {
+    throw new Error("Tour type not found.");
+  }
+
+  if (Object.keys(payload).length === 0) {
+    return existingTourType;
+  }
+
+  // ✅ name বদলালে duplicate check + slug regenerate
+  if (payload.name && payload.name !== existingTourType.name) {
+    const duplicate = await TourType.findOne({
+      _id: { $ne: id },
+      name: payload.name,
+    });
+    if (duplicate) {
+      throw new Error("A tour type with this name already exists.");
+    }
+    if (!payload.slug) {
+      payload.slug = generateSlug(payload.name);
+    }
+  }
+
+  return await TourType.findByIdAndUpdate(id, payload, {
+    new: true,
+    runValidators: true,
+  });
+};
+
+/* ============================================================
+ *  TOUR TYPE — DELETE
+ * ============================================================ */
+const deleteTourType = async (id: string) => {
+  const existingTourType = await TourType.findById(id);
+  if (!existingTourType) {
+    throw new Error("Tour type not found.");
+  }
+
+  // ✅ referential integrity — কোনো tour এই type ব্যবহার করছে কি না
+  const tourCount = await Tour.countDocuments({ tourType: id });
+  if (tourCount > 0) {
+    throw new Error(
+      `Cannot delete tour type. ${tourCount} tour(s) are using it.`,
+    );
+  }
+
+  return await TourType.findByIdAndDelete(id);
+};
+
+export const TourService = {
+  createTour,
+  createTourType,
+  deleteTourType,
+  updateTourType,
+  getAllTourTypes,
+  getSingleTourType,
+  getSingleTour,
+  getAllTours,
+  updateTour,
+  deleteTour,
+};
+
+===== ./src/app/modules/tour/tour.validation.ts =====
+import { z } from "zod";
+
+/* ============================================================
+ *  REUSABLE SUB-SCHEMAS
+ * ============================================================ */
+
+const tourPlanItemSchema = z.object({
+  day: z.number().int().min(1, "Day must be at least 1"),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  meals: z.array(z.string()).optional(),
+  accommodation: z.string().optional(),
+});
+
+const priceSchema = z.object({
+  adult: z.number().min(0, "Adult price cannot be negative"),
+  child: z.number().min(0).optional(),
+  discountPercent: z.number().min(0).max(100).optional(),
+});
+
+const durationSchema = z.object({
+  days: z.number().int().min(1, "Days must be at least 1"),
+  nights: z.number().int().min(0, "Nights cannot be negative"),
+});
+
+/* ============================================================
+ *  TOUR — CREATE
+ * ============================================================ */
+
+export const createTourZodSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  slug: z.string().optional(), // না দিলে server auto-generate করবে
+  description: z.string().optional(),
+  coverImage: z.string().optional(),
+  images: z.array(z.string()).optional(),
+
+  destinations: z
+    .array(z.string())
+    .min(1, "At least one destination is required"),
+  primaryDestination: z.string().optional(),
+
+  tourType: z.string().min(1, "Tour type is required"),
+
+  category: z
+    .enum(["group", "family", "honeymoon", "adventure", "corporate"])
+    .optional(),
+  difficulty: z.enum(["easy", "moderate", "hard"]).optional(),
+
+  duration: durationSchema,
+  price: priceSchema,
+
+  included: z.array(z.string()).optional(),
+  excluded: z.array(z.string()).optional(),
+  amenities: z.array(z.string()).optional(),
+  tourPlan: z.array(tourPlanItemSchema).optional(),
+
+  minGroupSize: z.number().int().min(1).optional(),
+  maxGuest: z.number().int().min(1).optional(),
+  minAge: z.number().int().min(0).optional(),
+  cancellationPolicy: z.string().optional(),
+
+  status: z.enum(["draft", "published", "archived"]).optional(),
+});
+
+/* ============================================================
+ *  TOUR — UPDATE
+ * ============================================================ */
+
+export const updateTourZodSchema = createTourZodSchema.partial().extend({
+  deleteImages: z.array(z.string()).optional(),
+});
+
+/* ============================================================
+ *  TOUR TYPE — CREATE
+ * ============================================================ */
+
+export const createTourTypeZodSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  description: z.string().optional(),
+  icon: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
+/* ============================================================
+ *  TOUR TYPE — UPDATE
+ * ============================================================ */
+
+export const updateTourTypeZodSchema = createTourTypeZodSchema.partial();
+
+===== ./src/app/modules/tour-departure/tourDeparture.controller.ts =====
+import { Request, Response } from "express";
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
+
+import { ITourDeparture } from "./tour-departure.interface";
+import { TourDepartureService } from "./tourDeparture.service";
+
+/* ============================================================
+ *  CREATE
+ * ============================================================ */
+const createTourDeparture = catchAsync(async (req: Request, res: Response) => {
+  const payload: ITourDeparture = req.body;
+  const result = await TourDepartureService.createTourDeparture(payload);
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: "Tour departure created successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  GET ALL
+ * ============================================================ */
+const getAllTourDepartures = catchAsync(async (req: Request, res: Response) => {
+  const result = await TourDepartureService.getAllTourDepartures(
+    req.query as Record<string, string>,
+  );
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour departures retrieved successfully",
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
+/* ============================================================
+ *  GET BY TOUR
+ * ============================================================ */
+const getDeparturesByTour = catchAsync(async (req: Request, res: Response) => {
+  const tourId = req.params.tourId as string;
+  const result = await TourDepartureService.getDeparturesByTour(
+    tourId,
+    req.query as Record<string, string>,
+  );
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour departures retrieved successfully",
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
+/* ============================================================
+ *  GET SINGLE
+ * ============================================================ */
+const getSingleTourDeparture = catchAsync(
+  async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const result = await TourDepartureService.getSingleTourDeparture(id);
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Tour departure retrieved successfully",
+      data: result,
+    });
+  },
+);
+
+/* ============================================================
+ *  UPDATE
+ * ============================================================ */
+const updateTourDeparture = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const payload: Partial<ITourDeparture> = req.body;
+  const result = await TourDepartureService.updateTourDeparture(id, payload);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour departure updated successfully",
+    data: result,
+  });
+});
+
+/* ============================================================
+ *  DELETE
+ * ============================================================ */
+const deleteTourDeparture = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await TourDepartureService.deleteTourDeparture(id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Tour departure deleted successfully",
+    data: result,
+  });
+});
+
+export const TourDepartureController = {
+  createTourDeparture,
+  getAllTourDepartures,
+  getDeparturesByTour,
+  getSingleTourDeparture,
+  updateTourDeparture,
+  deleteTourDeparture,
+};
+
+===== ./src/app/modules/tour-departure/tour-departure.interface.ts =====
+import { Types } from "mongoose";
+
+export enum TOUR_DEPARTURE_STATUS {
+  SCHEDULED = "SCHEDULED",
+  OPEN = "OPEN",
+  FULL = "FULL",
+  CANCELLED = "CANCELLED",
+  COMPLETED = "COMPLETED",
+}
+
+export interface ITourDeparture {
+  tour: Types.ObjectId;
+  startDate: Date;
+  endDate: Date;
+  pricePerPerson: number;
+  totalSeats: number;
+  availableSeats: number;
+  bookedSeats: number; // derive করা যায়, কিন্তু query-তে দরকার
+  minGroupSize?: number; // tour থেকে override
+  status: TOUR_DEPARTURE_STATUS;
+  guide?: Types.ObjectId; // ref to User (guide role)
+  meetingPoint?: string;
+  cancellationReason?: string;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+===== ./src/app/modules/tour-departure/tour-departure.model.ts =====
+import { model, Schema } from "mongoose";
+import {
+  ITourDeparture,
+  TOUR_DEPARTURE_STATUS,
+} from "./tour-departure.interface";
+
+/* ============================================================
+ *  TOUR DEPARTURE SCHEMA
+ * ============================================================ */
+
+const tourDepartureSchema = new Schema<ITourDeparture>(
+  {
+    tour: {
+      type: Schema.Types.ObjectId,
+      ref: "Tour",
+      required: true,
+    },
+    startDate: {
+      type: Date,
+      required: true,
+    },
+    endDate: {
+      type: Date,
+      required: true,
+    },
+    pricePerPerson: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    totalSeats: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    availableSeats: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    bookedSeats: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    minGroupSize: {
+      type: Number,
+      min: 1,
+    },
+    status: {
+      type: String,
+      enum: Object.values(TOUR_DEPARTURE_STATUS),
+      default: TOUR_DEPARTURE_STATUS.SCHEDULED,
+    },
+    guide: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    meetingPoint: {
+      type: String,
+      trim: true,
+    },
+    cancellationReason: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+/* ============================================================
+ *  INDEXES
+ * ============================================================ */
+
+tourDepartureSchema.index({ tour: 1, startDate: 1 }, { unique: true });
+tourDepartureSchema.index({ status: 1, startDate: 1 });
+tourDepartureSchema.index({ tour: 1, status: 1 });
+
+/* ============================================================
+ *  HOOKS
+ * ============================================================ */
+
+// endDate > startDate
+tourDepartureSchema.pre("validate", function () {
+  if (this.startDate && this.endDate && this.endDate <= this.startDate) {
+    throw new Error("End date must be after start date");
+  }
+});
+
+// availableSeats + bookedSeats = totalSeats
+tourDepartureSchema.pre("validate", function () {
+  if (this.availableSeats + this.bookedSeats !== this.totalSeats) {
+    throw new Error("availableSeats + bookedSeats must equal totalSeats");
+  }
+});
+
+// availableSeats 0 হলে FULL, ফিরে এলে OPEN
+tourDepartureSchema.pre("save", function () {
+  if (
+    this.isModified("availableSeats") &&
+    this.availableSeats === 0 &&
+    this.status === TOUR_DEPARTURE_STATUS.OPEN
+  ) {
+    this.status = TOUR_DEPARTURE_STATUS.FULL;
+  }
+  if (
+    this.isModified("availableSeats") &&
+    this.availableSeats > 0 &&
+    this.status === TOUR_DEPARTURE_STATUS.FULL
+  ) {
+    this.status = TOUR_DEPARTURE_STATUS.OPEN;
+  }
+});
+
+/* ============================================================
+ *  MODEL
+ * ============================================================ */
+
+export const TourDeparture = model<ITourDeparture>(
+  "TourDeparture",
+  tourDepartureSchema,
+);
+
+===== ./src/app/modules/tour-departure/tourDeparture.route.ts =====
+import { Router } from "express";
+import { checkAuth } from "../../middlewares/checkAuth";
+import { validateRequest } from "../../middlewares/validateRequest";
+import { Role } from "../user/user.interface";
+import { TourDepartureController } from "./tourDeparture.controller";
+import {
+  createTourDepartureZodSchema,
+  updateTourDepartureZodSchema,
+} from "./tourDeparture.validation";
+
+const router = Router();
+
+/* ------------------ PUBLIC ROUTES -------------------- */
+router.get("/", TourDepartureController.getAllTourDepartures);
+
+router.get("/tour/:tourId", TourDepartureController.getDeparturesByTour);
+
+router.get("/:id", TourDepartureController.getSingleTourDeparture);
+
+/* ------------------ ADMIN ROUTES --------------------- */
+router.post(
+  "/create",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  validateRequest(createTourDepartureZodSchema),
+  TourDepartureController.createTourDeparture,
+);
+
+router.patch(
+  "/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  validateRequest(updateTourDepartureZodSchema),
+  TourDepartureController.updateTourDeparture,
+);
+
+router.delete(
+  "/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  TourDepartureController.deleteTourDeparture,
+);
+
+export const TourDepartureRoutes = router;
+
+===== ./src/app/modules/tour-departure/tourDeparture.service.ts =====
+import { QueryBuilder } from "../../utils/QueryBuilder";
+import { Booking } from "../booking/booking.model";
+import { Tour } from "../tour/tour.model";
+import {
+  ITourDeparture,
+  TOUR_DEPARTURE_STATUS,
+} from "./tour-departure.interface";
+import { TourDeparture } from "./tour-departure.model";
+
+/* ============================================================
+ *  CREATE
+ * ============================================================ */
+const createTourDeparture = async (payload: ITourDeparture) => {
+  // ✅ tour exist করে কি না
+  const tour = await Tour.findById(payload.tour);
+  if (!tour) {
+    throw new Error("Tour not found.");
+  }
+
+  // ✅ date validation
+  if (new Date(payload.endDate) <= new Date(payload.startDate)) {
+    throw new Error("End date must be after start date");
+  }
+
+  // ✅ একই tour + startDate-এ duplicate check
+  const existing = await TourDeparture.findOne({
+    tour: payload.tour,
+    startDate: payload.startDate,
+  });
+  if (existing) {
+    throw new Error("A departure already exists for this tour on this date.");
+  }
+
+  // ✅ availableSeats না দিলে totalSeats-ই হবে
+  if (payload.availableSeats === undefined) {
+    payload.availableSeats = payload.totalSeats;
+  }
+  if (payload.bookedSeats === undefined) {
+    payload.bookedSeats = 0;
+  }
+
+  // ✅ seat arithmetic validation
+  if (payload.availableSeats + payload.bookedSeats !== payload.totalSeats) {
+    throw new Error("availableSeats + bookedSeats must equal totalSeats");
+  }
+
+  return await TourDeparture.create(payload);
+};
+
+/* ============================================================
+ *  GET ALL (admin)
+ * ============================================================ */
+const getAllTourDepartures = async (query: Record<string, string>) => {
+  const queryBuilder = new QueryBuilder(TourDeparture.find(), query);
+
+  const departures = queryBuilder.filter().sort().fields().paginate();
+
+  const [data, meta] = await Promise.all([
+    departures
+      .build()
+      .populate("tour", "title slug coverImage duration price")
+      .populate("guide", "name email"),
+    queryBuilder.getMeta(),
+  ]);
+
+  return { data, meta };
+};
+
+/* ============================================================
+ *  GET BY TOUR (public — frontend-এ date list দেখাতে)
+ * ============================================================ */
+const getDeparturesByTour = async (
+  tourId: string,
+  query: Record<string, string>,
+) => {
+  const tour = await Tour.findById(tourId);
+  if (!tour) {
+    throw new Error("Tour not found.");
+  }
+
+  const queryBuilder = new QueryBuilder(
+    TourDeparture.find({ tour: tourId }),
+    query,
+  );
+
+  const departures = queryBuilder.filter().sort().fields().paginate();
+
+  const [data, meta] = await Promise.all([
+    departures.build().populate("guide", "name"),
+    queryBuilder.getMeta(),
+  ]);
+
+  return { data, meta };
+};
+
+/* ============================================================
+ *  GET SINGLE
+ * ============================================================ */
+const getSingleTourDeparture = async (id: string) => {
+  const departure = await TourDeparture.findById(id)
+    .populate("tour", "title slug coverImage duration price")
+    .populate("guide", "name email");
+
+  if (!departure) {
+    throw new Error("Tour departure not found.");
+  }
+
+  return departure;
+};
+
+/* ============================================================
+ *  UPDATE
+ * ============================================================ */
+const updateTourDeparture = async (
+  id: string,
+  payload: Partial<ITourDeparture>,
+) => {
+  const existing = await TourDeparture.findById(id);
+  if (!existing) {
+    throw new Error("Tour departure not found.");
+  }
+
+  // ✅ date validation (একটা বা দুটোই বদলালে)
+  const startDate = payload.startDate ?? existing.startDate;
+  const endDate = payload.endDate ?? existing.endDate;
+  if (new Date(endDate) <= new Date(startDate)) {
+    throw new Error("End date must be after start date");
+  }
+
+  // ✅ totalSeats বদলালে availableSeats recalculate
+  if (payload.totalSeats !== undefined) {
+    if (payload.totalSeats < existing.bookedSeats) {
+      throw new Error(
+        `Cannot reduce total seats below booked seats (${existing.bookedSeats}).`,
+      );
+    }
+    payload.availableSeats = payload.totalSeats - existing.bookedSeats;
+  }
+
+  // ✅ tour বা startDate বদলালে duplicate check
+  if (payload.tour || payload.startDate) {
+    const duplicate = await TourDeparture.findOne({
+      _id: { $ne: id },
+      tour: payload.tour ?? existing.tour,
+      startDate: payload.startDate ?? existing.startDate,
+    });
+    if (duplicate) {
+      throw new Error("A departure already exists for this tour on this date.");
+    }
+  }
+
+  // ✅ tour বদলালে exist করে কি না
+  if (payload.tour) {
+    const tour = await Tour.findById(payload.tour);
+    if (!tour) {
+      throw new Error("Tour not found.");
+    }
+  }
+
+  const updated = await TourDeparture.findByIdAndUpdate(id, payload, {
+    new: true,
+    runValidators: true,
+  });
+
+  return updated;
+};
+
+/* ============================================================
+ *  DELETE
+ * ============================================================ */
+const deleteTourDeparture = async (id: string) => {
+  const departure = await TourDeparture.findById(id);
+  if (!departure) {
+    throw new Error("Tour departure not found.");
+  }
+
+  // ✅ booking থাকলে delete আটকান
+  const bookingCount = await Booking.countDocuments({ tourDeparture: id });
+  if (bookingCount > 0) {
+    throw new Error(
+      `Cannot delete departure. ${bookingCount} booking(s) exist.`,
+    );
+  }
+
+  await TourDeparture.findByIdAndDelete(id);
+  return null;
+};
+
+/* ============================================================
+ *  HELPER — atomic seat decrement (Booking service-এ ব্যবহার হবে)
+ * ============================================================ */
+const reserveSeats = async (departureId: string, seatCount: number) => {
+  const departure = await TourDeparture.findOneAndUpdate(
+    {
+      _id: departureId,
+      status: {
+        $in: [TOUR_DEPARTURE_STATUS.OPEN, TOUR_DEPARTURE_STATUS.SCHEDULED],
+      },
+      availableSeats: { $gte: seatCount },
+    },
+    {
+      $inc: {
+        availableSeats: -seatCount,
+        bookedSeats: seatCount,
+      },
+    },
+    { new: true },
+  );
+
+  if (!departure) {
+    throw new Error("Not enough seats available.");
+  }
+
+  // ✅ FULL status auto-update (findOneAndUpdate hook চলে না)
+  if (departure.availableSeats === 0) {
+    await TourDeparture.updateOne(
+      { _id: departureId },
+      { $set: { status: TOUR_DEPARTURE_STATUS.FULL } },
+    );
+  }
+
+  return departure;
+};
+
+/* ============================================================
+ *  HELPER — seat release (booking cancel/expire হলে)
+ * ============================================================ */
+const releaseSeats = async (departureId: string, seatCount: number) => {
+  const departure = await TourDeparture.findByIdAndUpdate(
+    departureId,
+    {
+      $inc: {
+        availableSeats: seatCount,
+        bookedSeats: -seatCount,
+      },
+    },
+    { new: true },
+  );
+
+  if (!departure) {
+    throw new Error("Tour departure not found.");
+  }
+
+  // ✅ FULL থেকে OPEN-এ ফেরত
+  if (
+    departure.availableSeats > 0 &&
+    departure.status === TOUR_DEPARTURE_STATUS.FULL
+  ) {
+    await TourDeparture.updateOne(
+      { _id: departureId },
+      { $set: { status: TOUR_DEPARTURE_STATUS.OPEN } },
+    );
+  }
+
+  return departure;
+};
+
+export const TourDepartureService = {
+  createTourDeparture,
+  getAllTourDepartures,
+  getDeparturesByTour,
+  getSingleTourDeparture,
+  updateTourDeparture,
+  deleteTourDeparture,
+  reserveSeats,
+  releaseSeats,
+};
+
+===== ./src/app/modules/tour-departure/tourDeparture.validation.ts =====
+import { z } from "zod";
+
+/* ============================================================
+ *  TOUR DEPARTURE — CREATE
+ * ============================================================ */
+
+export const createTourDepartureZodSchema = z.object({
+  tour: z.string().min(1, "Tour is required"),
+  startDate: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), "Invalid start date"),
+  endDate: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), "Invalid end date"),
+  pricePerPerson: z.number().min(0, "Price cannot be negative"),
+  totalSeats: z.number().int().min(1, "Total seats must be at least 1"),
+  availableSeats: z.number().int().min(0).optional(),
+  bookedSeats: z.number().int().min(0).optional(),
+  minGroupSize: z.number().int().min(1).optional(),
+  status: z
+    .enum(["SCHEDULED", "OPEN", "FULL", "CANCELLED", "COMPLETED"])
+    .optional(),
+  guide: z.string().optional(),
+  meetingPoint: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+/* ============================================================
+ *  TOUR DEPARTURE — UPDATE
+ * ============================================================ */
+
+export const updateTourDepartureZodSchema = createTourDepartureZodSchema
+  .partial()
+  .extend({
+    cancellationReason: z.string().optional(),
+  });
+
+===== ./src/app/modules/user/user.constant.ts =====
+export const userSearchableFields = ["name", "email", "address"];
+
+===== ./src/app/modules/user/user.controller.ts =====
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+import { NextFunction, Request, Response } from "express";
+import httpStatus from "http-status-codes";
+import { JwtPayload } from "jsonwebtoken";
+
+import { catchAsync } from "../../utils/catchAsync";
+import { sendResponse } from "../../utils/sendResponse";
+import { UserServices } from "./user.service";
+import { createUserZodSchema } from "./user.validation";
+
+const createUser = catchAsync(async (req: Request, res: Response) => {
+  const payload = createUserZodSchema.parse(req.body);
+
+  const user = await UserServices.createUser(payload);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.CREATED,
+    message: "User Created Successfully",
+    data: user,
+  });
+});
+
+const updateUser = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.params.id as string;
+    const verifiedToken = req.user;
+    const payload = req.body;
+    const user = await UserServices.updateUser(
+      userId,
+      payload,
+      verifiedToken as JwtPayload,
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.CREATED,
+      message: "User Updated Successfully",
+      data: user,
+    });
+  },
+);
+
+const getAllUsers = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const query = req.query;
+    const result = await UserServices.getAllUsers(
+      query as Record<string, string>,
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.CREATED,
+      message: "All Users Retrieved Successfully",
+      data: result.data,
+      meta: result.meta,
+    });
+  },
+);
+
+const getSingleUser = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const id = req.params.id as string;
+    const result = await UserServices.getSingleUser(id);
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.CREATED,
+      message: "User Retrieved Successfully",
+      data: result.data,
+    });
+  },
+);
+
+const getMe = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const decodedToken = req.user as JwtPayload;
+    const result = await UserServices.getMe(decodedToken.userId);
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Your profile Retrieved Successfully",
+      data: result.data,
+    });
+  },
+);
+
+export const UserControllers = {
+  createUser,
+  getAllUsers,
+  getSingleUser,
+  updateUser,
+  getMe,
+};
+
+===== ./src/app/modules/user/user.interface.ts =====
+import { Types } from "mongoose";
+
+export enum Role {
+  SUPER_ADMIN = "SUPER_ADMIN",
+  ADMIN = "ADMIN",
+  USER = "USER",
+  GUIDE = "GUIDE",
+}
+
+export enum IsActive {
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
+  BLOCKED = "BLOCKED",
+}
+
+export interface IAuthProvider {
+  provider: "google" | "credentials";
+  providerId: string;
+}
+
+export interface IUser {
+  _id?: Types.ObjectId;
+  name: string;
+  email: string;
+  password?: string;
+  phone?: string;
+  picture?: string;
+  address?: string;
+  isDeleted?: boolean;
+  isActive?: IsActive;
+  role: Role;
+  auths: IAuthProvider[];
+  bookings?: Types.ObjectId[];
+  guides?: Types.ObjectId[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+===== ./src/app/modules/user/user.model.ts =====
+import { model, Schema } from "mongoose";
+import { IAuthProvider, IsActive, IUser, Role } from "./user.interface";
+
+const authProviderSchema = new Schema<IAuthProvider>(
+  {
+    provider: {
+      type: String,
+      enum: ["google", "credentials"],
+      required: true,
+    },
+    providerId: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+  },
+  {
+    versionKey: false,
+    _id: false,
+  },
+);
+
+const userSchema = new Schema<IUser>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 50,
+    },
+
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+      maxlength: 100,
+    },
+
+    password: {
+      type: String,
+      select: false,
+    },
+
+    role: {
+      type: String,
+      enum: Object.values(Role),
+      default: Role.USER,
+      required: true,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+    },
+
+    picture: {
+      type: String,
+      trim: true,
+    },
+
+    address: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+    },
+
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+
+    isActive: {
+      type: String,
+      enum: Object.values(IsActive),
+      default: IsActive.ACTIVE,
+      required: true,
+    },
+
+    auths: {
+      type: [authProviderSchema],
+      default: [],
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+  },
+);
+
+export const User = model<IUser>("User", userSchema);
+
+===== ./src/app/modules/user/user.route.ts =====
+import { Router } from "express";
+
+import { UserControllers } from "./user.controller";
+import { Role } from "./user.interface";
+
+import { checkAuth } from "../../middlewares/checkAuth";
+import { validateRequest } from "../../middlewares/validateRequest";
+import { createUserZodSchema, updateUserZodSchema } from "./user.validation";
+
+const router = Router();
+
+router.post(
+  "/register",
+  validateRequest(createUserZodSchema),
+  UserControllers.createUser,
+);
+router.get(
+  "/all-users",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  UserControllers.getAllUsers,
+);
+router.get("/me", checkAuth(...Object.values(Role)), UserControllers.getMe);
+router.get(
+  "/:id",
+  checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
+  UserControllers.getSingleUser,
+);
+router.patch(
+  "/:id",
+  validateRequest(updateUserZodSchema),
+  checkAuth(...Object.values(Role)),
+  UserControllers.updateUser,
+);
+export const UserRoutes = router;
+
+===== ./src/app/modules/user/user.service.ts =====
+import bcryptjs from "bcryptjs";
+import httpStatus from "http-status-codes";
+import { JwtPayload } from "jsonwebtoken";
+import { envVars } from "../../config/env";
+import AppError from "../../errorHelpers/AppError";
+import { QueryBuilder } from "../../utils/QueryBuilder";
+import { userSearchableFields } from "./user.constant";
+import { IAuthProvider, IUser, Role } from "./user.interface";
+import { User } from "./user.model";
+import { CreateUserInput } from "./user.validation";
+
+const createUser = async (payload: CreateUserInput) => {
+  const email = payload.email.trim().toLowerCase();
+
+  const isUserExist = await User.findOne({ email }).select("+password");
+
+  if (isUserExist) {
+    throw new AppError(
+      httpStatus.CONFLICT,
+      "An account with this email already exists.",
+    );
+  }
+
+  const saltRounds = Number(envVars.BCRYPT_SALT_ROUND);
+
+  if (!Number.isInteger(saltRounds) || saltRounds < 1) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Password hashing configuration is invalid.",
+    );
+  }
+
+  const hashedPassword = await bcryptjs.hash(payload.password, saltRounds);
+
+  const authProvider: IAuthProvider = {
+    provider: "credentials",
+    providerId: email,
+  };
+
+  try {
+    const user = await User.create({
+      name: payload.name.trim(),
+      email,
+      password: hashedPassword,
+      phone: payload.phone,
+      address: payload.address,
+
+      // Public registration must never choose its own role.
+      role: Role.USER,
+
+      auths: [authProvider],
+    });
+
+    // Explicitly return only safe fields.
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      picture: user.picture,
+      address: user.address,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
+  } catch (error: unknown) {
+    // MongoDB duplicate-key error.
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === 11000
+    ) {
+      throw new AppError(
+        httpStatus.CONFLICT,
+        "An account with this email already exists.",
+      );
+    }
+
+    throw error;
+  }
+};
+
+const updateUser = async (
+  userId: string,
+  payload: Partial<IUser>,
+  decodedToken: JwtPayload,
+) => {
+  if (decodedToken.role === Role.USER || decodedToken.role === Role.GUIDE) {
+    if (userId !== decodedToken.userId) {
+      throw new AppError(401, "You are not authorized");
+    }
+  }
+
+  const ifUserExist = await User.findById(userId);
+
+  if (!ifUserExist) {
+    throw new AppError(httpStatus.NOT_FOUND, "User Not Found");
+  }
+
+  if (
+    decodedToken.role === Role.ADMIN &&
+    ifUserExist.role === Role.SUPER_ADMIN
+  ) {
+    throw new AppError(401, "You are not authorized");
+  }
+
+  if (payload.role) {
+    if (decodedToken.role === Role.USER || decodedToken.role === Role.GUIDE) {
+      throw new AppError(httpStatus.FORBIDDEN, "You are not authorized");
+    }
+  }
+
+  if (payload.isActive || payload.isDeleted) {
+    if (decodedToken.role === Role.USER || decodedToken.role === Role.GUIDE) {
+      throw new AppError(httpStatus.FORBIDDEN, "You are not authorized");
+    }
+  }
+
+  const newUpdatedUser = await User.findByIdAndUpdate(userId, payload, {
+    new: true,
+    runValidators: true,
+  });
+
+  return newUpdatedUser;
+};
+const getAllUsers = async (query: Record<string, string>) => {
+  const queryBuilder = new QueryBuilder(User.find(), query);
+  const usersData = queryBuilder
+    .filter()
+    .search(userSearchableFields)
+    .sort()
+    .fields()
+    .paginate();
+
+  const [data, meta] = await Promise.all([
+    usersData.build(),
+    queryBuilder.getMeta(),
+  ]);
+
+  return {
+    data,
+    meta,
+  };
+};
+const getSingleUser = async (id: string) => {
+  const user = await User.findById(id).select("-password");
+  return {
+    data: user,
+  };
+};
+// const getMe = async (userId: string) => {
+//   const user = await User.findById(userId).select("-password");
+//   return {
+//     data: user,
+//   };
+// };
+
+const getMe = async (userId: string) => {
+  const user = await User.findById(userId).select("-password");
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User Not Found");
+  }
+  return {
+    data: user,
+  };
+};
+export const UserServices = {
+  createUser,
+  getAllUsers,
+  getSingleUser,
+  updateUser,
+  getMe,
+};
+
+===== ./src/app/modules/user/user.validation.ts =====
+import { z } from "zod";
+import { IsActive, Role } from "./user.interface";
+
+export const createUserZodSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Name must be at least 2 characters long.")
+      .max(50, "Name cannot exceed 50 characters."),
+
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email("Invalid email address format.")
+      .min(5, "Email must be at least 5 characters long.")
+      .max(100, "Email cannot exceed 100 characters."),
+
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters long.")
+      .regex(/[A-Z]/, "Password must contain at least 1 uppercase letter.")
+      .regex(
+        /[!@#$%^&*]/,
+        "Password must contain at least 1 special character.",
+      )
+      .regex(/\d/, "Password must contain at least 1 number."),
+
+    phone: z
+      .string()
+      .trim()
+      .regex(
+        /^(?:\+8801\d{9}|01\d{9})$/,
+        "Phone number must be +8801XXXXXXXXX or 01XXXXXXXXX.",
+      )
+      .optional(),
+
+    address: z
+      .string()
+      .trim()
+      .max(200, "Address cannot exceed 200 characters.")
+      .optional(),
+  })
+  .strict();
+
+export const updateUserZodSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Name must be at least 2 characters long.")
+      .max(50, "Name cannot exceed 50 characters.")
+      .optional(),
+
+    phone: z
+      .string()
+      .trim()
+      .regex(
+        /^(?:\+8801\d{9}|01\d{9})$/,
+        "Phone number must be +8801XXXXXXXXX or 01XXXXXXXXX.",
+      )
+      .optional(),
+
+    address: z
+      .string()
+      .trim()
+      .max(200, "Address cannot exceed 200 characters.")
+      .optional(),
+
+    role: z.nativeEnum(Role).optional(),
+
+    isActive: z.nativeEnum(IsActive).optional(),
+
+    isDeleted: z.boolean().optional(),
+  })
+  .strict();
+
+export type CreateUserInput = z.infer<typeof createUserZodSchema>;
+
+export type UpdateUserInput = z.infer<typeof updateUserZodSchema>;
+
+===== ./src/app/router/index.ts =====
+import { Router } from "express";
+import { AuthRoutes } from "../modules/auth/auth.route";
+import { DivisionRoutes } from "../modules/division/division.route";
+import { TourRoutes } from "../modules/tour/tour.route";
+import { UserRoutes } from "../modules/user/user.route";
+
+export const router = Router();
+
+const moduleRoutes = [
+  {
+    path: "/auth",
+    route: AuthRoutes,
+  },
+  {
+    path: "/user",
+    route: UserRoutes,
+  },
+  {
+    path: "/tour",
+    route: TourRoutes,
+  },
+  {
+    path: "/division",
+    route: DivisionRoutes,
+  },
+];
+
+moduleRoutes.forEach((route) => {
+  router.use(route.path, route.route);
+});
+
+===== ./src/app/utils/catchAsync.ts =====
+import { NextFunction, Request, Response } from "express";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type AsyncHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => Promise<void>;
+
+export const catchAsync =
+  (fn: AsyncHandler) => (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch((err: any) => {
+      next(err);
+    });
+  };
+
+===== ./src/app/utils/getTransactionId.ts =====
+export const getTransactionId = () => {
+  return `tran_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+};
+
+===== ./src/app/utils/invoice.ts =====
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import PDFDocument from "pdfkit";
+import AppError from "../errorHelpers/AppError";
+
+export interface IInvoiceData {
+  transactionId: string;
+  bookingDate: Date;
+  userName: string;
+  tourTitle: string;
+  guestCount: number;
+  totalAmount: number;
+}
+
+export const generatePdf = async (
+  invoiceData: IInvoiceData,
+): Promise<Buffer<ArrayBufferLike>> => {
+  try {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: "A4", margin: 50 });
+      const buffer: Uint8Array[] = [];
+
+      doc.on("data", (chunk) => buffer.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(buffer)));
+      doc.on("error", (err) => reject(err));
+
+      //PDF Content
+      doc.fontSize(20).text("Invoice", { align: "center" });
+      doc.moveDown();
+      doc.fontSize(14).text(`Transaction ID : ${invoiceData.transactionId}`);
+      doc.text(`Booking Date : ${invoiceData.bookingDate}`);
+      doc.text(`Customer : ${invoiceData.userName}`);
+
+      doc.moveDown();
+
+      doc.text(`Tour: ${invoiceData.tourTitle}`);
+      doc.text(`Guests: ${invoiceData.guestCount}`);
+      doc.text(`Total Amount: $${invoiceData.totalAmount.toFixed(2)}`);
+      doc.moveDown();
+
+      doc.text("Thank you for booking with us!", { align: "center" });
+
+      doc.end();
+    });
+  } catch (error: any) {
+    console.log(error);
+    throw new AppError(401, `Pdf creation error ${error.message}`);
+  }
+};
+
+===== ./src/app/utils/jwt.ts =====
+import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
+
+export const generateToken = (
+  payload: JwtPayload,
+  secret: string,
+  expiresIn: string,
+) => {
+  const token = jwt.sign(payload, secret, {
+    expiresIn,
+  } as SignOptions);
+
+  return token;
+};
+
+export const verifyToken = (token: string, secret: string) => {
+  const verifiedToken = jwt.verify(token, secret);
+
+  return verifiedToken;
+};
+
+===== ./src/app/utils/QueryBuilder.ts =====
+import { Query } from "mongoose";
+import { excludeField } from "../constant";
+
+export class QueryBuilder<T> {
+  public modelQuery: Query<T[], T>;
+  public readonly query: Record<string, string>;
+
+  constructor(modelQuery: Query<T[], T>, query: Record<string, string>) {
+    this.modelQuery = modelQuery;
+    this.query = query;
+  }
+
+  filter(): this {
+    const filter = { ...this.query };
+
+    for (const field of excludeField) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete filter[field];
+    }
+
+    this.modelQuery = this.modelQuery.find(filter); // Tour.find().find(filter)
+
+    return this;
+  }
+
+  search(searchableField: string[]): this {
+    const searchTerm = this.query.searchTerm || "";
+    const searchQuery = {
+      $or: searchableField.map((field) => ({
+        [field]: { $regex: searchTerm, $options: "i" },
+      })),
+    };
+    this.modelQuery = this.modelQuery.find(searchQuery);
+    return this;
+  }
+
+  sort(): this {
+    const sort = this.query.sort || "-createdAt";
+
+    this.modelQuery = this.modelQuery.sort(sort);
+
+    return this;
+  }
+  fields(): this {
+    const fields = this.query.fields?.split(",").join(" ") || "";
+
+    this.modelQuery = this.modelQuery.select(fields);
+
+    return this;
+  }
+  paginate(): this {
+    const page = Number(this.query.page) || 1;
+    const limit = Number(this.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    this.modelQuery = this.modelQuery.skip(skip).limit(limit);
+
+    return this;
+  }
+
+  build() {
+    return this.modelQuery;
+  }
+
+  async getMeta() {
+    const totalDocuments = await this.modelQuery.model.countDocuments();
+
+    const page = Number(this.query.page) || 1;
+    const limit = Number(this.query.limit) || 10;
+
+    const totalPage = Math.ceil(totalDocuments / limit);
+
+    return { page, limit, total: totalDocuments, totalPage };
+  }
+}
+
+===== ./src/app/utils/seedSuperAdmin.ts =====
+
+===== ./src/app/utils/sendEmail.ts =====
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import ejs from "ejs";
+import nodemailer from "nodemailer";
+import path from "path";
+import AppError from "../errorHelpers/AppError";
+
+const transporter = nodemailer.createTransport({
+  // port: envVars.EMAIL_SENDER.SMTP_PORT,
+  secure: true,
+  // auth: {
+  //   user: envVars.EMAIL_SENDER.SMTP_USER,
+  //   pass: envVars.EMAIL_SENDER.SMTP_PASS,
+  // },
+  // port: Number(envVars.EMAIL_SENDER.SMTP_PORT),
+  // host: envVars.EMAIL_SENDER.SMTP_HOST,
+});
+
+interface SendEmailOptions {
+  to: string;
+  subject: string;
+  templateName: string;
+  templateData?: Record<string, any>;
+  attachments?: {
+    filename: string;
+    content: Buffer | string;
+    contentType: string;
+  }[];
+}
+
+export const sendEmail = async ({
+  to,
+  subject,
+  templateName,
+  templateData,
+  attachments,
+}: SendEmailOptions) => {
+  try {
+    const templatePath = path.join(__dirname, `templates/${templateName}.ejs`);
+    const html = await ejs.renderFile(templatePath, templateData);
+    const info = await transporter.sendMail({
+      // from: envVars.EMAIL_SENDER.SMTP_FROM,
+      to: to,
+      subject: subject,
+      html: html,
+      attachments: attachments?.map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content,
+        contentType: attachment.contentType,
+      })),
+    });
+    console.log(`\u2709\uFE0F Email sent to ${to}: ${info.messageId}`);
+  } catch (error: any) {
+    console.log("email sending error", error.message);
+    throw new AppError(401, "Email error");
+  }
+};
+
+===== ./src/app/utils/sendResponse.ts =====
+import { Response } from "express";
+
+interface TMeta {
+  page: number;
+  limit: number;
+  totalPage: number;
+  total: number;
+}
+
+interface TResponse<T> {
+  statusCode: number;
+  success: boolean;
+  message: string;
+  data: T;
+  meta?: TMeta;
+}
+
+export const sendResponse = <T>(res: Response, data: TResponse<T>) => {
+  res.status(data.statusCode).json({
+    statusCode: data.statusCode,
+    success: data.success,
+    message: data.message,
+    meta: data.meta,
+    data: data.data,
+  });
+};
+
+===== ./src/app/utils/setCookie.ts =====
+import { Response } from "express";
+import { envVars } from "../config/env";
+
+export interface AuthTokens {
+  accessToken?: string;
+  refreshToken?: string;
+}
+
+export const setAuthCookie = (res: Response, tokenInfo: AuthTokens) => {
+  if (tokenInfo.accessToken) {
+    res.cookie("accessToken", tokenInfo.accessToken, {
+      httpOnly: true,
+      secure: envVars.NODE_ENV === "production",
+      sameSite: "none",
+    });
+  }
+
+  if (tokenInfo.refreshToken) {
+    res.cookie("refreshToken", tokenInfo.refreshToken, {
+      httpOnly: true,
+      secure: envVars.NODE_ENV === "production",
+      sameSite: "none",
+    });
+  }
+};
+
+===== ./src/app/utils/userTokens.ts =====
+import httpStatus from "http-status-codes";
+import { JwtPayload } from "jsonwebtoken";
+import { envVars } from "../config/env";
+import AppError from "../errorHelpers/AppError";
+import { IsActive, IUser } from "../modules/user/user.interface";
+import { User } from "../modules/user/user.model";
+import { generateToken, verifyToken } from "./jwt";
+
+export const createUserTokens = (user: Partial<IUser>) => {
+  const jwtPayload = {
+    userId: user._id,
+    email: user.email,
+    role: user.role,
+  };
+  const accessToken = generateToken(
+    jwtPayload,
+    envVars.JWT_ACCESS_SECRET,
+    envVars.JWT_ACCESS_EXPIRES,
+  );
+
+  const refreshToken = generateToken(
+    jwtPayload,
+    envVars.JWT_REFRESH_SECRET,
+    envVars.JWT_REFRESH_EXPIRES,
+  );
+
+  return {
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const createNewAccessTokenWithRefreshToken = async (
+  refreshToken: string,
+) => {
+  const verifiedRefreshToken = verifyToken(
+    refreshToken,
+    envVars.JWT_REFRESH_SECRET,
+  ) as JwtPayload;
+
+  const isUserExist = await User.findOne({ email: verifiedRefreshToken.email });
+
+  if (!isUserExist) {
+    throw new AppError(httpStatus.BAD_REQUEST, "User does not exist");
+  }
+  if (
+    isUserExist.isActive === IsActive.BLOCKED ||
+    isUserExist.isActive === IsActive.INACTIVE
+  ) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      `User is ${isUserExist.isActive}`,
+    );
+  }
+  if (isUserExist.isDeleted) {
+    throw new AppError(httpStatus.BAD_REQUEST, "User is deleted");
+  }
+
+  const jwtPayload = {
+    userId: isUserExist._id,
+    email: isUserExist.email,
+    role: isUserExist.role,
+  };
+  const accessToken = generateToken(
+    jwtPayload,
+    envVars.JWT_ACCESS_SECRET,
+    envVars.JWT_ACCESS_EXPIRES,
+  );
+
+  return accessToken;
+};
+
+===== ./src/server.ts =====
+/* eslint-disable no-console */
+import { Server } from "http";
+import mongoose from "mongoose";
+import app from "./app";
+import { envVars } from "./app/config/env";
+
+let server: Server;
+
+const startServer = async () => {
+  try {
+    await mongoose.connect(envVars.DB_URL);
+
+    console.log("Connected to DB!!");
+
+    server = app.listen(envVars.PORT, () => {
+      console.log(`Server is listening to port ${envVars.PORT}`);
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+(async () => {
+  await startServer();
+})();
+
+process.on("SIGTERM", () => {
+  console.log("SIGTERM signal recieved... Server shutting down..");
+
+  if (server) {
+    server.close(() => {
+      process.exit(1);
+    });
+  }
+
+  process.exit(1);
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT signal recieved... Server shutting down..");
+
+  if (server) {
+    server.close(() => {
+      process.exit(1);
+    });
+  }
+
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.log("Unhandled Rejecttion detected... Server shutting down..", err);
+
+  if (server) {
+    server.close(() => {
+      process.exit(1);
+    });
+  }
+
+  process.exit(1);
+});
+
+process.on("uncaughtException", (err) => {
+  console.log("Uncaught Exception detected... Server shutting down..", err);
+
+  if (server) {
+    server.close(() => {
+      process.exit(1);
+    });
+  }
+
+  process.exit(1);
+});
+
+// Unhandler rejection error
+// Promise.reject(new Error("I forgot to catch this promise"))
+
+// Uncaught Exception Error
+// throw new Error("I forgot to handle this local erro")
+
+/**
+ * unhandled rejection error
+ * uncaught rejection error
+ * signal termination sigterm
+ */
+
+===== ./tsconfig.json =====
+{
+  "compilerOptions": {
+    /* Visit https://aka.ms/tsconfig to read more about this file */
+
+    /* Projects */
+    // "incremental": true,                              /* Save .tsbuildinfo files to allow for incremental compilation of projects. */
+    // "composite": true,                                /* Enable constraints that allow a TypeScript project to be used with project references. */
+    // "tsBuildInfoFile": "./.tsbuildinfo",              /* Specify the path to .tsbuildinfo incremental compilation file. */
+    // "disableSourceOfProjectReferenceRedirect": true,  /* Disable preferring source files instead of declaration files when referencing composite projects. */
+    // "disableSolutionSearching": true,                 /* Opt a project out of multi-project reference checking when editing. */
+    // "disableReferencedProjectLoad": true,             /* Reduce the number of projects loaded automatically by TypeScript. */
+
+    /* Language and Environment */
+    "target": "es2016",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
+    // "lib": [],                                        /* Specify a set of bundled library declaration files that describe the target runtime environment. */
+    // "jsx": "preserve",                                /* Specify what JSX code is generated. */
+    // "libReplacement": true,                           /* Enable lib replacement. */
+    // "experimentalDecorators": true,                   /* Enable experimental support for legacy experimental decorators. */
+    // "emitDecoratorMetadata": true,                    /* Emit design-type metadata for decorated declarations in source files. */
+    // "jsxFactory": "",                                 /* Specify the JSX factory function used when targeting React JSX emit, e.g. 'React.createElement' or 'h'. */
+    // "jsxFragmentFactory": "",                         /* Specify the JSX Fragment reference used for fragments when targeting React JSX emit e.g. 'React.Fragment' or 'Fragment'. */
+    // "jsxImportSource": "",                            /* Specify module specifier used to import the JSX factory functions when using 'jsx: react-jsx*'. */
+    // "reactNamespace": "",                             /* Specify the object invoked for 'createElement'. This only applies when targeting 'react' JSX emit. */
+    // "noLib": true,                                    /* Disable including any library files, including the default lib.d.ts. */
+    // "useDefineForClassFields": true,                  /* Emit ECMAScript-standard-compliant class fields. */
+    // "moduleDetection": "auto",                        /* Control what method is used to detect module-format JS files. */
+
+    /* Modules */
+    "module": "commonjs",                                /* Specify what module code is generated. */
+    "rootDir": "./src",                                  /* Specify the root folder within your source files. */
+    // "moduleResolution": "node10",                     /* Specify how TypeScript looks up a file from a given module specifier. */
+    // "baseUrl": "./",                                  /* Specify the base directory to resolve non-relative module names. */
+    // "paths": {},                                      /* Specify a set of entries that re-map imports to additional lookup locations. */
+    // "rootDirs": [],                                   /* Allow multiple folders to be treated as one when resolving modules. */
+    // "typeRoots": [],                                  /* Specify multiple folders that act like './node_modules/@types'. */
+    // "types": [],                                      /* Specify type package names to be included without being referenced in a source file. */
+    // "allowUmdGlobalAccess": true,                     /* Allow accessing UMD globals from modules. */
+    // "moduleSuffixes": [],                             /* List of file name suffixes to search when resolving a module. */
+    // "allowImportingTsExtensions": true,               /* Allow imports to include TypeScript file extensions. Requires '--moduleResolution bundler' and either '--noEmit' or '--emitDeclarationOnly' to be set. */
+    // "rewriteRelativeImportExtensions": true,          /* Rewrite '.ts', '.tsx', '.mts', and '.cts' file extensions in relative import paths to their JavaScript equivalent in output files. */
+    // "resolvePackageJsonExports": true,                /* Use the package.json 'exports' field when resolving package imports. */
+    // "resolvePackageJsonImports": true,                /* Use the package.json 'imports' field when resolving imports. */
+    // "customConditions": [],                           /* Conditions to set in addition to the resolver-specific defaults when resolving imports. */
+    // "noUncheckedSideEffectImports": true,             /* Check side effect imports. */
+    // "resolveJsonModule": true,                        /* Enable importing .json files. */
+    // "allowArbitraryExtensions": true,                 /* Enable importing files with any extension, provided a declaration file is present. */
+    // "noResolve": true,                                /* Disallow 'import's, 'require's or '<reference>'s from expanding the number of files TypeScript should add to a project. */
+
+    /* JavaScript Support */
+    // "allowJs": true,                                  /* Allow JavaScript files to be a part of your program. Use the 'checkJS' option to get errors from these files. */
+    // "checkJs": true,                                  /* Enable error reporting in type-checked JavaScript files. */
+    // "maxNodeModuleJsDepth": 1,                        /* Specify the maximum folder depth used for checking JavaScript files from 'node_modules'. Only applicable with 'allowJs'. */
+
+    /* Emit */
+    // "declaration": true,                              /* Generate .d.ts files from TypeScript and JavaScript files in your project. */
+    // "declarationMap": true,                           /* Create sourcemaps for d.ts files. */
+    // "emitDeclarationOnly": true,                      /* Only output d.ts files and not JavaScript files. */
+    // "sourceMap": true,                                /* Create source map files for emitted JavaScript files. */
+    // "inlineSourceMap": true,                          /* Include sourcemap files inside the emitted JavaScript. */
+    // "noEmit": true,                                   /* Disable emitting files from a compilation. */
+    // "outFile": "./",                                  /* Specify a file that bundles all outputs into one JavaScript file. If 'declaration' is true, also designates a file that bundles all .d.ts output. */
+    "outDir": "./dist",                                   /* Specify an output folder for all emitted files. */
+    // "removeComments": true,                           /* Disable emitting comments. */
+    // "importHelpers": true,                            /* Allow importing helper functions from tslib once per project, instead of including them per-file. */
+    // "downlevelIteration": true,                       /* Emit more compliant, but verbose and less performant JavaScript for iteration. */
+    // "sourceRoot": "",                                 /* Specify the root path for debuggers to find the reference source code. */
+    // "mapRoot": "",                                    /* Specify the location where debugger should locate map files instead of generated locations. */
+    // "inlineSources": true,                            /* Include source code in the sourcemaps inside the emitted JavaScript. */
+    // "emitBOM": true,                                  /* Emit a UTF-8 Byte Order Mark (BOM) in the beginning of output files. */
+    // "newLine": "crlf",                                /* Set the newline character for emitting files. */
+    // "stripInternal": true,                            /* Disable emitting declarations that have '@internal' in their JSDoc comments. */
+    // "noEmitHelpers": true,                            /* Disable generating custom helper functions like '__extends' in compiled output. */
+    // "noEmitOnError": true,                            /* Disable emitting files if any type checking errors are reported. */
+    // "preserveConstEnums": true,                       /* Disable erasing 'const enum' declarations in generated code. */
+    // "declarationDir": "./",                           /* Specify the output directory for generated declaration files. */
+
+    /* Interop Constraints */
+    // "isolatedModules": true,                          /* Ensure that each file can be safely transpiled without relying on other imports. */
+    // "verbatimModuleSyntax": true,                     /* Do not transform or elide any imports or exports not marked as type-only, ensuring they are written in the output file's format based on the 'module' setting. */
+    // "isolatedDeclarations": true,                     /* Require sufficient annotation on exports so other tools can trivially generate declaration files. */
+    // "erasableSyntaxOnly": true,                       /* Do not allow runtime constructs that are not part of ECMAScript. */
+    // "allowSyntheticDefaultImports": true,             /* Allow 'import x from y' when a module doesn't have a default export. */
+    "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
+    // "preserveSymlinks": true,                         /* Disable resolving symlinks to their realpath. This correlates to the same flag in node. */
+    "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
+
+    /* Type Checking */
+    "strict": true,                                      /* Enable all strict type-checking options. */
+    // "noImplicitAny": true,                            /* Enable error reporting for expressions and declarations with an implied 'any' type. */
+    // "strictNullChecks": true,                         /* When type checking, take into account 'null' and 'undefined'. */
+    // "strictFunctionTypes": true,                      /* When assigning functions, check to ensure parameters and the return values are subtype-compatible. */
+    // "strictBindCallApply": true,                      /* Check that the arguments for 'bind', 'call', and 'apply' methods match the original function. */
+    // "strictPropertyInitialization": true,             /* Check for class properties that are declared but not set in the constructor. */
+    // "strictBuiltinIteratorReturn": true,              /* Built-in iterators are instantiated with a 'TReturn' type of 'undefined' instead of 'any'. */
+    // "noImplicitThis": true,                           /* Enable error reporting when 'this' is given the type 'any'. */
+    // "useUnknownInCatchVariables": true,               /* Default catch clause variables as 'unknown' instead of 'any'. */
+    // "alwaysStrict": true,                             /* Ensure 'use strict' is always emitted. */
+    // "noUnusedLocals": true,                           /* Enable error reporting when local variables aren't read. */
+    // "noUnusedParameters": true,                       /* Raise an error when a function parameter isn't read. */
+    // "exactOptionalPropertyTypes": true,               /* Interpret optional property types as written, rather than adding 'undefined'. */
+    // "noImplicitReturns": true,                        /* Enable error reporting for codepaths that do not explicitly return in a function. */
+    // "noFallthroughCasesInSwitch": true,               /* Enable error reporting for fallthrough cases in switch statements. */
+    // "noUncheckedIndexedAccess": true,                 /* Add 'undefined' to a type when accessed using an index. */
+    // "noImplicitOverride": true,                       /* Ensure overriding members in derived classes are marked with an override modifier. */
+    // "noPropertyAccessFromIndexSignature": true,       /* Enforces using indexed accessors for keys declared using an indexed type. */
+    // "allowUnusedLabels": true,                        /* Disable error reporting for unused labels. */
+    // "allowUnreachableCode": true,                     /* Disable error reporting for unreachable code. */
+
+    /* Completeness */
+    // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
+    "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
+  }
+}

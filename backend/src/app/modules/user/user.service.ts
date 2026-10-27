@@ -12,7 +12,7 @@ import { CreateUserInput } from "./user.validation";
 const createUser = async (payload: CreateUserInput) => {
   const email = payload.email.trim().toLowerCase();
 
-  const isUserExist = await User.findOne({ email }).select("+password");
+  const isUserExist = await User.exists({ email });
 
   if (isUserExist) {
     throw new AppError(
@@ -53,7 +53,7 @@ const createUser = async (payload: CreateUserInput) => {
 
     // Explicitly return only safe fields.
     return {
-      _id: user._id,
+      _id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
@@ -62,6 +62,7 @@ const createUser = async (payload: CreateUserInput) => {
       role: user.role,
       isActive: user.isActive,
       createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
   } catch (error: unknown) {
     // MongoDB duplicate-key error.
@@ -88,7 +89,7 @@ const updateUser = async (
 ) => {
   if (decodedToken.role === Role.USER || decodedToken.role === Role.GUIDE) {
     if (userId !== decodedToken.userId) {
-      throw new AppError(401, "You are not authorized");
+      throw new AppError(httpStatus.UNAUTHORIZED, "You are not authorized");
     }
   }
 
@@ -104,17 +105,32 @@ const updateUser = async (
   ) {
     throw new AppError(401, "You are not authorized");
   }
-
   if (payload.role) {
+    if (decodedToken.role === Role.USER || decodedToken.role === Role.GUIDE) {
+      throw new AppError(httpStatus.FORBIDDEN, "You are not authorized");
+    }
+    if (decodedToken.role === Role.ADMIN && payload.role === Role.SUPER_ADMIN) {
+      throw new AppError(
+        httpStatus.FORBIDDEN,
+        "Only SUPER_ADMIN can assign SUPER_ADMIN role",
+      );
+    }
+  }
+
+  if (payload.isActive !== undefined || payload.isDeleted !== undefined) {
     if (decodedToken.role === Role.USER || decodedToken.role === Role.GUIDE) {
       throw new AppError(httpStatus.FORBIDDEN, "You are not authorized");
     }
   }
 
-  if (payload.isActive || payload.isDeleted) {
-    if (decodedToken.role === Role.USER || decodedToken.role === Role.GUIDE) {
-      throw new AppError(httpStatus.FORBIDDEN, "You are not authorized");
-    }
+  if (
+    decodedToken.role === Role.ADMIN &&
+    ifUserExist.role === Role.SUPER_ADMIN
+  ) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "You cannot modify a SUPER_ADMIN account",
+    );
   }
 
   const newUpdatedUser = await User.findByIdAndUpdate(userId, payload, {
@@ -144,26 +160,25 @@ const getAllUsers = async (query: Record<string, string>) => {
   };
 };
 const getSingleUser = async (id: string) => {
-  const user = await User.findById(id).select("-password");
-  return {
-    data: user,
-  };
-};
-// const getMe = async (userId: string) => {
-//   const user = await User.findById(userId).select("-password");
-//   return {
-//     data: user,
-//   };
-// };
-
-const getMe = async (userId: string) => {
-  const user = await User.findById(userId).select("-password");
+  const user = await User.findOne({ _id: id, isDeleted: false }).select(
+    "-password -auths",
+  );
   if (!user) {
     throw new AppError(httpStatus.NOT_FOUND, "User Not Found");
   }
   return {
     data: user,
   };
+};
+
+const getMe = async (userId: string) => {
+  const user = await User.findOne({ _id: userId, isDeleted: false }).select(
+    "-password -auths",
+  );
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User Not Found");
+  }
+  return user;
 };
 export const UserServices = {
   createUser,

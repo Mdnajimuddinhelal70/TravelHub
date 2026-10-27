@@ -7,12 +7,9 @@ import { JwtPayload } from "jsonwebtoken";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { UserServices } from "./user.service";
-import { createUserZodSchema } from "./user.validation";
 
 const createUser = catchAsync(async (req: Request, res: Response) => {
-  const payload = createUserZodSchema.parse(req.body);
-
-  const user = await UserServices.createUser(payload);
+  const user = await UserServices.createUser(req.body);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.CREATED,
@@ -33,7 +30,7 @@ const updateUser = catchAsync(
     );
     sendResponse(res, {
       success: true,
-      statusCode: httpStatus.CREATED,
+      statusCode: httpStatus.OK,
       message: "User Updated Successfully",
       data: user,
     });
@@ -48,7 +45,7 @@ const getAllUsers = catchAsync(
     );
     sendResponse(res, {
       success: true,
-      statusCode: httpStatus.CREATED,
+      statusCode: httpStatus.OK,
       message: "All Users Retrieved Successfully",
       data: result.data,
       meta: result.meta,
@@ -62,7 +59,7 @@ const getSingleUser = catchAsync(
     const result = await UserServices.getSingleUser(id);
     sendResponse(res, {
       success: true,
-      statusCode: httpStatus.CREATED,
+      statusCode: httpStatus.OK,
       message: "User Retrieved Successfully",
       data: result.data,
     });
@@ -72,12 +69,12 @@ const getSingleUser = catchAsync(
 const getMe = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const decodedToken = req.user as JwtPayload;
-    const result = await UserServices.getMe(decodedToken.userId);
+    const user = await UserServices.getMe(decodedToken.userId);
     sendResponse(res, {
       success: true,
       statusCode: httpStatus.OK,
       message: "Your profile Retrieved Successfully",
-      data: result.data,
+      data: user,
     });
   },
 );

@@ -7,10 +7,6 @@ import {
   ITraveler,
 } from "./booking.interface";
 
-/* ============================================================
- *  SUB-SCHEMAS
- * ============================================================ */
-
 const travelerSchema = new Schema<ITraveler>(
   {
     name: {

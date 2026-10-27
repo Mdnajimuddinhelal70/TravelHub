@@ -12,13 +12,17 @@ const serverFetchHelper = async (
 
   const headersWithAuth = new Headers(headers);
 
+  // if (accessToken) {
+  //   headersWithAuth.set("Authorization", accessToken);
+  // }
   if (accessToken) {
-    headersWithAuth.set("Authorization", accessToken);
+    headersWithAuth.set("Authorization", `Bearer ${accessToken}`);
   }
 
   const response = await fetch(`${BACKEND_API_URL}${endpoint}`, {
     ...restOptions,
     headers: headersWithAuth,
+    credentials: "include",
   });
 
   return response;

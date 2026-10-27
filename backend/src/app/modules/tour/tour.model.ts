@@ -1,10 +1,6 @@
 import { model, Schema } from "mongoose";
 import { ITour, ITourType } from "./tour.interface";
 
-/* ============================================================
- *  TOUR TYPE SCHEMA
- * ============================================================ */
-
 const tourTypeSchema = new Schema<ITourType>(
   {
     name: {
@@ -32,16 +28,17 @@ const tourTypeSchema = new Schema<ITourType>(
       type: Boolean,
       default: true,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,
     versionKey: false,
   },
 );
-
-/* ============================================================
- *  TOUR SCHEMA
- * ============================================================ */
 
 const tourPlanSchema = new Schema(
   {
@@ -198,6 +195,11 @@ const tourSchema = new Schema<ITour>(
       enum: ["draft", "published", "archived"],
       default: "draft",
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -205,11 +207,6 @@ const tourSchema = new Schema<ITour>(
   },
 );
 
-/* ============================================================
- *  INDEXES
- * ============================================================ */
-
-// Text search (title + description)
 tourSchema.index({ title: "text", description: "text" });
 
 // Filter + sort
@@ -222,10 +219,6 @@ tourSchema.index({ createdAt: -1 });
 
 // tourTypeSchema-এর জন্য
 tourTypeSchema.index({ isActive: 1 });
-
-/* ============================================================
- *  MODELS
- * ============================================================ */
 
 export const TourType = model<ITourType>("TourType", tourTypeSchema);
 export const Tour = model<ITour>("Tour", tourSchema);

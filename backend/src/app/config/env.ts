@@ -11,6 +11,8 @@ interface EnvConfig {
   JWT_ACCESS_EXPIRES: string;
   JWT_REFRESH_SECRET: string;
   JWT_REFRESH_EXPIRES: string;
+  JWT_RESET_PASSWORD_SECRET: string;
+  JWT_RESET_PASSWORD_EXPIRES: string;
   SUPER_ADMIN_EMAIL: string;
   SUPER_ADMIN_PASSWORD: string;
   GOOGLE_CLIENT_SECRET: string;
@@ -36,6 +38,11 @@ interface EnvConfig {
     CLOUDINARY_API_KEY: string;
     CLOUDINARY_API_SECRET: string;
   };
+  EMAIL_SENDER: string;
+  EMAIL_PASS: string;
+  EMAIL_HOST: string;
+  EMAIL_PORT: string;
+  EMAIL_USER: string;
   // EMAIL_SENDER: {
   //   SMTP_USER: string;
   //   SMTP_PASS: string;
@@ -79,6 +86,13 @@ const loadEnvVariables = (): EnvConfig => {
     "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
+    "JWT_RESET_PASSWORD_SECRET",
+    "JWT_RESET_PASSWORD_EXPIRES",
+    "EMAIL_SENDER",
+    "EMAIL_PASS",
+    "EMAIL_HOST",
+    "EMAIL_PORT",
+    "EMAIL_USER",
     // "SMTP_PASS",
     // "SMTP_PORT",
     // "SMTP_HOST",
@@ -107,6 +121,9 @@ const loadEnvVariables = (): EnvConfig => {
     JWT_ACCESS_EXPIRES: process.env.JWT_ACCESS_EXPIRES as string,
     JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET as string,
     JWT_REFRESH_EXPIRES: process.env.JWT_REFRESH_EXPIRES as string,
+    JWT_RESET_PASSWORD_SECRET: process.env.JWT_RESET_PASSWORD_SECRET as string,
+    JWT_RESET_PASSWORD_EXPIRES: process.env
+      .JWT_RESET_PASSWORD_EXPIRES as string,
     SUPER_ADMIN_EMAIL: process.env.SUPER_ADMIN_EMAIL as string,
     SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD as string,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET as string,
@@ -133,6 +150,13 @@ const loadEnvVariables = (): EnvConfig => {
       CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY as string,
       CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET as string,
     },
+
+    EMAIL_SENDER: process.env.EMAIL_SENDER as string,
+    EMAIL_PASS: process.env.EMAIL_PASS as string,
+    EMAIL_HOST: process.env.EMAIL_HOST as string,
+    EMAIL_PORT: process.env.EMAIL_PORT as string,
+    EMAIL_USER: process.env.EMAIL_USER as string,
+
     //   EMAIL_SENDER: {
     //     SMTP_USER: process.env.SMTP_USER as string,
     //     SMTP_PASS: process.env.SMTP_PASS as string,

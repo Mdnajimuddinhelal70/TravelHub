@@ -1,18 +1,29 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import ejs from "ejs";
+import fs from "fs";
+import httpStatus from "http-status-codes";
 import nodemailer from "nodemailer";
 import path from "path";
+import { envVars } from "../config/env";
 import AppError from "../errorHelpers/AppError";
 
 const transporter = nodemailer.createTransport({
-  // port: envVars.EMAIL_SENDER.SMTP_PORT,
-  secure: true,
-  // auth: {
-  //   user: envVars.EMAIL_SENDER.SMTP_USER,
-  //   pass: envVars.EMAIL_SENDER.SMTP_PASS,
-  // },
-  // port: Number(envVars.EMAIL_SENDER.SMTP_PORT),
-  // host: envVars.EMAIL_SENDER.SMTP_HOST,
+  host: envVars.EMAIL_HOST,
+  port: Number(envVars.EMAIL_PORT),
+  // port 465 → secure: true, port 587/2525 → secure: false
+  secure: Number(envVars.EMAIL_PORT) === 465,
+  auth: {
+    user: envVars.EMAIL_USER,
+    pass: envVars.EMAIL_PASS,
+  },
+});
+
+// Startup-এ connection verify করো
+transporter.verify((error) => {
+  if (error) {
+    console.error("❌ Email transporter verification failed:", error.message);
+  } else {
+    console.log("✅ Email transporter is ready");
+  }
 });
 
 interface SendEmailOptions {
@@ -35,22 +46,48 @@ export const sendEmail = async ({
   attachments,
 }: SendEmailOptions) => {
   try {
-    const templatePath = path.join(__dirname, `templates/${templateName}.ejs`);
-    const html = await ejs.renderFile(templatePath, templateData);
+    const templatePath = path.join(
+      __dirname,
+      "..",
+      "templates",
+      `${templateName}.ejs`,
+    );
+    if (!fs.existsSync(templatePath)) {
+      throw new AppError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        `Email template not found: ${templateName}.ejs`,
+      );
+    }
+
+    const html = await ejs.renderFile(templatePath, templateData ?? {});
+
     const info = await transporter.sendMail({
-      // from: envVars.EMAIL_SENDER.SMTP_FROM,
-      to: to,
-      subject: subject,
-      html: html,
+      from: `"Travel Hub" <${envVars.EMAIL_SENDER}>`,
+      to,
+      subject,
+      html,
       attachments: attachments?.map((attachment) => ({
         filename: attachment.filename,
         content: attachment.content,
         contentType: attachment.contentType,
       })),
     });
-    console.log(`\u2709\uFE0F Email sent to ${to}: ${info.messageId}`);
-  } catch (error: any) {
-    console.log("email sending error", error.message);
-    throw new AppError(401, "Email error");
+
+    console.log(`✉️ Email sent to ${to}: ${info.messageId}`);
+    return info;
+  } catch (error: unknown) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Unknown email error";
+
+    console.error("❌ sendEmail failed:", message);
+
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      `Email error: ${message}`,
+    );
   }
 };

@@ -7,6 +7,7 @@ import {
   VerifyCallback,
 } from "passport-google-oauth20";
 import { Strategy as LocalStrategy } from "passport-local";
+
 import { IsActive, Role } from "../modules/user/user.interface";
 import { User } from "../modules/user/user.model";
 import { envVars } from "./env";
@@ -39,18 +40,18 @@ passport.use(
         }
 
         const isGoogleAuthenticated = isUserExist.auths.some(
-          (providerObjects) => providerObjects.provider == "google",
+          (p) => p.provider === "google",
         );
 
         if (isGoogleAuthenticated && !isUserExist.password) {
           return done(null, false, {
             message:
-              "You have authenticated through Google. So if you want to login with credentials, then at first login with google and set a password for your Gmail and then you can login with email and password.",
+              "You have authenticated through Google. Please login with Google first and set a password, then you can login with email and password.",
           });
         }
 
         const isPasswordMatched = await bcryptjs.compare(
-          password as string,
+          password,
           isUserExist.password as string,
         );
 
@@ -60,8 +61,8 @@ passport.use(
 
         return done(null, isUserExist);
       } catch (error) {
-        console.log(error);
-        done(error);
+        console.error("Local Strategy Error:", error);
+        return done(error as Error, false);
       }
     },
   ),
@@ -75,19 +76,20 @@ passport.use(
       callbackURL: envVars.GOOGLE_CALLBACK_URL,
     },
     async (
-      accessToken: string,
-      refreshToken: string,
+      _accessToken: string,
+      _refreshToken: string,
       profile: Profile,
       done: VerifyCallback,
     ) => {
       try {
-        const email = profile.emails?.[0].value;
+        const email = profile.emails?.[0]?.value;
 
         if (!email) {
           return done(null, false, { message: "No email found" });
         }
 
         let isUserExist = await User.findOne({ email });
+
         if (
           isUserExist &&
           (isUserExist.isActive === IsActive.BLOCKED ||
@@ -106,7 +108,7 @@ passport.use(
           isUserExist = await User.create({
             email,
             name: profile.displayName,
-            picture: profile.photos?.[0].value,
+            picture: profile.photos?.[0]?.value,
             role: Role.USER,
             auths: [
               {
@@ -119,23 +121,23 @@ passport.use(
 
         return done(null, isUserExist);
       } catch (error) {
-        console.log("Google Strategy Error", error);
-        return done(error);
+        console.error("Google Strategy Error:", error);
+        return done(error as Error, false);
       }
     },
   ),
 );
 
-passport.serializeUser((user: any, done: (err: any, id?: unknown) => void) => {
+passport.serializeUser((user: any, done) => {
   done(null, user._id);
 });
 
-passport.deserializeUser(async (id: string, done: any) => {
+passport.deserializeUser(async (id: string, done) => {
   try {
     const user = await User.findById(id);
     done(null, user);
   } catch (error) {
-    console.log(error);
-    done(error);
+    console.error("Deserialize Error:", error);
+    done(error as Error, null);
   }
 });

@@ -1,4 +1,4 @@
-import jwt, { JwtPayload } from "jsonwebtoken";
+import { jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 import {
   getDefaultDashboardRoute,
@@ -22,13 +22,15 @@ export async function proxy(request: NextRequest) {
       if (!secret) {
         throw new Error("JWT_ACCESS_SECRET is not configured.");
       }
+      const { payload } = await jwtVerify(
+        accessToken,
+        new TextEncoder().encode(secret),
+      );
 
-      const decoded = jwt.verify(accessToken, secret) as JwtPayload;
-
-      if (!isUserRole(decoded.role)) {
+      if (!isUserRole(payload.role)) {
         invalidToken = true;
       } else {
-        userRole = decoded.role;
+        userRole = payload.role as UserRole;
       }
     } catch {
       invalidToken = true;
