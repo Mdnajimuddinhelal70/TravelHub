@@ -5,7 +5,7 @@ import { getTours } from "@/services/tour/getTours";
 
 const ToursPage = async () => {
   const { tours } = await getTours({ status: "published", limit: "100" });
-  console.log(tours);
+  // console.log(tours);
   return (
     <div>
       <ToursHeroSection />

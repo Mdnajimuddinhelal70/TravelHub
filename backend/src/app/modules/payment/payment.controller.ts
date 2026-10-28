@@ -16,18 +16,26 @@ const initPayment = catchAsync(async (req: Request, res: Response) => {
   });
 });
 const successPayment = catchAsync(async (req: Request, res: Response) => {
-  const query = req.query;
-  const result = await PaymentService.successPayment(
-    query as Record<string, string>,
-  );
-
-  if (result.success) {
-    res.redirect(
-      `${envVars.SSL.SSL_SUCCESS_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
+  try {
+    const query = req.query;
+    const result = await PaymentService.successPayment(
+      query as Record<string, string>,
     );
-  } else {
+
+    if (result.success) {
+      res.redirect(
+        `${envVars.SSL.SSL_SUCCESS_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
+      );
+    } else {
+      res.redirect(
+        `${envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
+      );
+    }
+  } catch (error) {
+    // ✅ Payment না পেলে fail page-এ redirect
+    const query = req.query;
     res.redirect(
-      `${envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
+      `${envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${query.transactionId ?? ""}&status=fail&message=Payment+could+not+be+verified`,
     );
   }
 });
@@ -37,10 +45,15 @@ const failPayment = catchAsync(async (req: Request, res: Response) => {
     query as Record<string, string>,
   );
 
+  const params = new URLSearchParams({
+    transactionId: String(query.transactionId ?? ""),
+    message: result.message,
+    amount: String(query.amount ?? ""),
+    status: String(query.status ?? ""),
+  });
+
   if (!result.success) {
-    res.redirect(
-      `${envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
-    );
+    res.redirect(`${envVars.SSL.SSL_FAIL_FRONTEND_URL}?${params}`);
   }
 });
 const cancelPayment = catchAsync(async (req: Request, res: Response) => {
@@ -49,10 +62,15 @@ const cancelPayment = catchAsync(async (req: Request, res: Response) => {
     query as Record<string, string>,
   );
 
+  const params = new URLSearchParams({
+    transactionId: String(query.transactionId ?? ""),
+    message: result.message,
+    amount: String(query.amount ?? ""),
+    status: String(query.status ?? ""),
+  });
+
   if (!result.success) {
-    res.redirect(
-      `${envVars.SSL.SSL_CANCEL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`,
-    );
+    res.redirect(`${envVars.SSL.SSL_CANCEL_FRONTEND_URL}?${params}`);
   }
 });
 
@@ -78,6 +96,20 @@ const validatePayment = catchAsync(async (req: Request, res: Response) => {
     data: null,
   });
 });
+const getPaymentByTransactionId = catchAsync(
+  async (req: Request, res: Response) => {
+    const { transactionId } = req.params;
+    const result = await PaymentService.getPaymentByTransactionId(
+      transactionId as string,
+    );
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: "Payment retrieved successfully",
+      data: result,
+    });
+  },
+);
 
 export const PaymentController = {
   initPayment,
@@ -86,4 +118,5 @@ export const PaymentController = {
   cancelPayment,
   getInvoiceDownloadUrl,
   validatePayment,
+  getPaymentByTransactionId,
 };

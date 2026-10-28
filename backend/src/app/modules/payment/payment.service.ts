@@ -305,10 +305,28 @@ const getInvoiceDownloadUrl = async (paymentId: string) => {
   return payment.invoiceUrl;
 };
 
+const getPaymentByTransactionId = async (transactionId: string) => {
+  const payment = await Payment.findOne({ transactionId }).populate({
+    path: "booking",
+    populate: [
+      { path: "tour", select: "title slug coverImage duration price" },
+      { path: "tourDeparture", select: "startDate endDate pricePerPerson" },
+      { path: "user", select: "name email phone" },
+    ],
+  });
+
+  if (!payment) {
+    throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
+  }
+
+  return payment;
+};
+
 export const PaymentService = {
   initPayment,
   successPayment,
   failPayment,
   cancelPayment,
   getInvoiceDownloadUrl,
+  getPaymentByTransactionId,
 };

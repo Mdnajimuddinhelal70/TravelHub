@@ -68,11 +68,9 @@ export const createBooking = async (_currentState: any, formData: FormData) => {
     const validatedPayload = validationResult.data;
 
     // --- API call ---
-    const response = await serverFetch.post("/booking", {
+    const response = await serverFetch.post("/booking/create", {
       body: JSON.stringify(validatedPayload),
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
 
     const result =
