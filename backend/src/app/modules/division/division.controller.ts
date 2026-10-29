@@ -8,9 +8,20 @@ import { DivisionService } from "./division.service";
  *  CREATE
  * ============================================================ */
 const createDivision = catchAsync(async (req: Request, res: Response) => {
+  const body = req.body;
+  let districts: string[] | undefined;
+
+  if (body.districts) {
+    try {
+      districts = JSON.parse(body.districts);
+    } catch {
+      districts = body.districts.split(",").map((s: string) => s.trim());
+    }
+  }
   const payload: IDivision = {
     ...req.body,
     thumbnail: req.file?.path,
+    districts,
   };
   const result = await DivisionService.createDivision(payload);
   sendResponse(res, {

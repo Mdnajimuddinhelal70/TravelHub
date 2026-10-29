@@ -6,9 +6,7 @@ import { Role } from "../user/user.interface";
 import { TourController } from "./tour.controller";
 import {
   createTourTypeZodSchema,
-  createTourZodSchema,
   updateTourTypeZodSchema,
-  updateTourZodSchema,
 } from "./tour.validation";
 
 const router = express.Router();
@@ -28,7 +26,7 @@ router.get("/tour-types/:id", TourController.getSingleTourType);
 router.patch(
   "/tour-types/:id",
   checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
-  validateRequest(updateTourTypeZodSchema), // ✅ update schema
+  validateRequest(updateTourTypeZodSchema),
   TourController.updateTourType,
 );
 
@@ -45,7 +43,7 @@ router.post(
   "/create",
   checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
   multerUpload.array("files"),
-  validateRequest(createTourZodSchema),
+  // validateRequest(createTourZodSchema),
   TourController.createTour,
 );
 
@@ -55,7 +53,7 @@ router.patch(
   "/:id",
   checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
   multerUpload.array("files"),
-  validateRequest(updateTourZodSchema),
+  // validateRequest(updateTourZodSchema),
   TourController.updateTour,
 );
 
