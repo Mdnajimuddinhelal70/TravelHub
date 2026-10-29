@@ -18,7 +18,7 @@ export const getCommonNavItems = (role: UserRole): NavSection[] => [
       },
       {
         title: "My Profile",
-        href: "/my-profile",
+        href: "/dashboard/my-profile",
         icon: "User",
         roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
       },
@@ -29,7 +29,7 @@ export const getCommonNavItems = (role: UserRole): NavSection[] => [
     items: [
       {
         title: "Change Password",
-        href: "/change-password",
+        href: "/dashboard/change-password",
         icon: "Settings",
         roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
       },

@@ -4,8 +4,11 @@ import { NextFunction, Request, Response } from "express";
 import httpStatus from "http-status-codes";
 import { JwtPayload } from "jsonwebtoken";
 
+import { deleteImageFromCLoudinary } from "../../config/cloudinary.config";
+import AppError from "../../errorHelpers/AppError";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
+import { User } from "./user.model";
 import { UserServices } from "./user.service";
 
 const createUser = catchAsync(async (req: Request, res: Response) => {
@@ -78,6 +81,52 @@ const getMe = catchAsync(
     });
   },
 );
+const uploadProfilePicture = catchAsync(async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new AppError(httpStatus.BAD_REQUEST, "No image file provided");
+  }
+
+  const newPictureUrl = req.file.path || (req.file as any).secure_url;
+
+  if (!newPictureUrl) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to upload image",
+    );
+  }
+
+  const userId = (req.user as JwtPayload).userId;
+
+  const existingUser = await User.findById(userId);
+  if (!existingUser) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  const oldPicture = existingUser.picture;
+
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    { picture: newPictureUrl },
+    { new: true, runValidators: true },
+  ).select("-password -auths -refreshToken");
+
+  // ✅ পুরনো picture delete (fire and forget)
+  if (oldPicture && oldPicture !== newPictureUrl) {
+    deleteImageFromCLoudinary(oldPicture).catch((err) =>
+      console.error("Failed to delete old picture:", err),
+    );
+  }
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Profile picture updated successfully",
+    data: {
+      picture: updatedUser?.picture,
+      user: updatedUser,
+    },
+  });
+});
 
 export const UserControllers = {
   createUser,
@@ -85,4 +134,5 @@ export const UserControllers = {
   getSingleUser,
   updateUser,
   getMe,
+  uploadProfilePicture,
 };
