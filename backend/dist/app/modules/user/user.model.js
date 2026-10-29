@@ -67,10 +67,28 @@ const userSchema = new mongoose_1.Schema({
         default: user_interface_1.IsActive.ACTIVE,
         required: true,
     },
+    refreshToken: {
+        type: String,
+        select: false,
+    },
     auths: {
         type: [authProviderSchema],
         default: [],
     },
+    bookings: [
+        {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: "Booking",
+            default: [],
+        },
+    ],
+    guides: [
+        {
+            type: mongoose_1.Schema.Types.ObjectId,
+            ref: "Guide",
+            default: [],
+        },
+    ],
 }, {
     timestamps: true,
     versionKey: false,

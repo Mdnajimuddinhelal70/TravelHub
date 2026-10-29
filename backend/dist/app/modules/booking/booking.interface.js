@@ -1,5 +1,4 @@
 "use strict";
-// // User - Booking(Pending) -> Payment (Unpaid) -> SSLCommerz -> Booking update = confirm -> Payment update = Paid
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BOOKING_STATUS = void 0;
 var BOOKING_STATUS;

@@ -1,8 +1,11 @@
+import { BOOKING_STATUS } from "../booking/booking.interface";
 import { Booking } from "../booking/booking.model";
 import { PAYMENT_STATUS } from "../payment/payment.interface";
 import { Payment } from "../payment/payment.model";
+import { TOUR_DEPARTURE_STATUS } from "../tour-departure/tour-departure.interface";
 import { TourDeparture } from "../tour-departure/tour-departure.model";
 import { Tour } from "../tour/tour.model";
+import { Role } from "../user/user.interface";
 import { User } from "../user/user.model";
 
 const getStats = async () => {
@@ -21,8 +24,8 @@ const getStats = async () => {
   ] = await Promise.all([
     // Bookings
     Booking.countDocuments(),
-    Booking.countDocuments({ status: "PENDING" }),
-    Booking.countDocuments({ status: "CONFIRMED" }),
+    Booking.countDocuments({ status: BOOKING_STATUS.PENDING }),
+    Booking.countDocuments({ status: BOOKING_STATUS.CONFIRMED }),
 
     // Revenue (sum of PAID payments)
     Payment.aggregate([
@@ -33,7 +36,7 @@ const getStats = async () => {
     // Users
     User.countDocuments({ isDeleted: false }),
     User.countDocuments({
-      role: { $in: ["ADMIN", "SUPER_ADMIN"] },
+      role: { $in: [Role.ADMIN, Role.SUPER_ADMIN] },
       isDeleted: false,
     }),
 
@@ -43,7 +46,7 @@ const getStats = async () => {
 
     // Departures
     TourDeparture.countDocuments(),
-    TourDeparture.countDocuments({ status: "OPEN" }),
+    TourDeparture.countDocuments({ status: TOUR_DEPARTURE_STATUS.OPEN }),
 
     // Recent bookings
     Booking.find()

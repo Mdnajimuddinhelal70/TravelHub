@@ -26,24 +26,49 @@ const initPayment = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0,
     });
 }));
 const successPayment = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const query = req.query;
-    const result = yield payment_service_1.PaymentService.successPayment(query);
-    if (result.success) {
-        res.redirect(`${env_1.envVars.SSL.SSL_SUCCESS_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`);
+    var _a;
+    try {
+        const query = req.query;
+        const result = yield payment_service_1.PaymentService.successPayment(query);
+        if (result.success) {
+            res.redirect(`${env_1.envVars.SSL.SSL_SUCCESS_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`);
+        }
+        else {
+            res.redirect(`${env_1.envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`);
+        }
+    }
+    catch (error) {
+        // ✅ Payment না পেলে fail page-এ redirect
+        const query = req.query;
+        res.redirect(`${env_1.envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${(_a = query.transactionId) !== null && _a !== void 0 ? _a : ""}&status=fail&message=Payment+could+not+be+verified`);
     }
 }));
 const failPayment = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
     const query = req.query;
     const result = yield payment_service_1.PaymentService.failPayment(query);
+    const params = new URLSearchParams({
+        transactionId: String((_a = query.transactionId) !== null && _a !== void 0 ? _a : ""),
+        message: result.message,
+        amount: String((_b = query.amount) !== null && _b !== void 0 ? _b : ""),
+        status: String((_c = query.status) !== null && _c !== void 0 ? _c : ""),
+    });
     if (!result.success) {
-        res.redirect(`${env_1.envVars.SSL.SSL_FAIL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`);
+        res.redirect(`${env_1.envVars.SSL.SSL_FAIL_FRONTEND_URL}?${params}`);
     }
 }));
 const cancelPayment = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
     const query = req.query;
     const result = yield payment_service_1.PaymentService.cancelPayment(query);
+    const params = new URLSearchParams({
+        transactionId: String((_a = query.transactionId) !== null && _a !== void 0 ? _a : ""),
+        message: result.message,
+        amount: String((_b = query.amount) !== null && _b !== void 0 ? _b : ""),
+        status: String((_c = query.status) !== null && _c !== void 0 ? _c : ""),
+    });
     if (!result.success) {
-        res.redirect(`${env_1.envVars.SSL.SSL_CANCEL_FRONTEND_URL}?transactionId=${query.transactionId}&message=${result.message}&amount=${query.amount}&status=${query.status}`);
+        res.redirect(`${env_1.envVars.SSL.SSL_CANCEL_FRONTEND_URL}?${params}`);
     }
 }));
 const getInvoiceDownloadUrl = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -66,6 +91,16 @@ const validatePayment = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(voi
         data: null,
     });
 }));
+const getPaymentByTransactionId = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { transactionId } = req.params;
+    const result = yield payment_service_1.PaymentService.getPaymentByTransactionId(transactionId);
+    (0, sendResponse_1.sendResponse)(res, {
+        statusCode: 200,
+        success: true,
+        message: "Payment retrieved successfully",
+        data: result,
+    });
+}));
 exports.PaymentController = {
     initPayment,
     successPayment,
@@ -73,4 +108,5 @@ exports.PaymentController = {
     cancelPayment,
     getInvoiceDownloadUrl,
     validatePayment,
+    getPaymentByTransactionId,
 };

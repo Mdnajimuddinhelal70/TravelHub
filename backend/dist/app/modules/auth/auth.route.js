@@ -14,19 +14,29 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthRoutes = void 0;
 const express_1 = require("express");
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const passport_1 = __importDefault(require("passport"));
 const env_1 = require("../../config/env");
 const checkAuth_1 = require("../../middlewares/checkAuth");
+const validateRequest_1 = require("../../middlewares/validateRequest");
 const user_interface_1 = require("../user/user.interface");
 const auth_controller_1 = require("./auth.controller");
+const auth_validation_1 = require("./auth.validation");
 const router = (0, express_1.Router)();
-router.post("/login", auth_controller_1.AuthControllers.credentialsLogin);
+const authLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10,
+    message: "Too many attempts, please try again later",
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+router.post("/login", authLimiter, (0, validateRequest_1.validateRequest)(auth_validation_1.loginZodSchema), auth_controller_1.AuthControllers.credentialsLogin);
 router.post("/refresh-token", auth_controller_1.AuthControllers.getNewAccessToken);
 router.post("/logout", auth_controller_1.AuthControllers.logout);
-router.post("/change-password", (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.Role)), auth_controller_1.AuthControllers.changePassword);
-router.post("/set-password", (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.Role)), auth_controller_1.AuthControllers.setPassword);
-router.post("/forgot-password", auth_controller_1.AuthControllers.forgotPassword);
-router.post("/reset-password", (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.Role)), auth_controller_1.AuthControllers.resetPassword);
+router.post("/change-password", (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.Role)), (0, validateRequest_1.validateRequest)(auth_validation_1.changePasswordZodSchema), auth_controller_1.AuthControllers.changePassword);
+router.post("/set-password", (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.Role)), (0, validateRequest_1.validateRequest)(auth_validation_1.setPasswordZodSchema), auth_controller_1.AuthControllers.setPassword);
+router.post("/forgot-password", authLimiter, (0, validateRequest_1.validateRequest)(auth_validation_1.forgotPasswordZodSchema), auth_controller_1.AuthControllers.forgotPassword);
+router.post("/reset-password", (0, validateRequest_1.validateRequest)(auth_validation_1.resetPasswordZodSchema), auth_controller_1.AuthControllers.resetPassword);
 router.get("/google", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const redirect = req.query.redirect || "/";
     passport_1.default.authenticate("google", {

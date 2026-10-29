@@ -8,17 +8,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -33,103 +22,135 @@ const sendEmail_1 = require("../../utils/sendEmail");
 const userTokens_1 = require("../../utils/userTokens");
 const user_interface_1 = require("../user/user.interface");
 const user_model_1 = require("../user/user.model");
-const credentialsLogin = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    const { email, password } = payload;
-    const isUserExist = yield user_model_1.User.findOne({ email });
-    if (!isUserExist) {
-        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "Email does not exist");
-    }
-    const isPasswordMatched = yield bcryptjs_1.default.compare(password, isUserExist.password);
-    if (!isPasswordMatched) {
-        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "Incorrect Password");
-    }
-    const userTokens = (0, userTokens_1.createUserTokens)(isUserExist);
-    const _a = isUserExist.toObject(), { password: pass } = _a, rest = __rest(_a, ["password"]);
-    return {
-        accessToken: userTokens.accessToken,
-        refreshToken: userTokens.refreshToken,
-        user: rest,
-    };
-});
 const getNewAccessToken = (refreshToken) => __awaiter(void 0, void 0, void 0, function* () {
-    const newAccessToken = yield (0, userTokens_1.createNewAccessTokenWithRefreshToken)(refreshToken);
-    return {
-        accessToken: newAccessToken,
-    };
+    let decoded;
+    try {
+        decoded = jsonwebtoken_1.default.verify(refreshToken, env_1.envVars.JWT_REFRESH_SECRET);
+    }
+    catch (_a) {
+        throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Invalid or expired refresh token");
+    }
+    const user = yield user_model_1.User.findOne({ email: decoded.email }).select("+refreshToken");
+    if (!user) {
+        throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "User not found");
+    }
+    if (user.isActive === user_interface_1.IsActive.BLOCKED ||
+        user.isActive === user_interface_1.IsActive.INACTIVE) {
+        throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, `User is ${user.isActive}`);
+    }
+    if (user.isDeleted) {
+        throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, "User is deleted");
+    }
+    // Refresh token rotation: DB-তে থাকা token-এর সাথে match করতে হবে
+    if (user.refreshToken !== refreshToken) {
+        throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Refresh token has been revoked or rotated");
+    }
+    const tokens = (0, userTokens_1.createUserTokens)(user);
+    user.refreshToken = tokens.refreshToken;
+    yield user.save();
+    return tokens;
 });
-const resetPassword = (payload, decodedToken) => __awaiter(void 0, void 0, void 0, function* () {
-    if (payload.id != decodedToken.userId) {
-        throw new AppError_1.default(401, "You can not reset your password");
+const changePassword = (oldPassword, newPassword, decodedToken) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield user_model_1.User.findById(decodedToken.userId).select("+password");
+    if (!user) {
+        throw new AppError_1.default(http_status_codes_1.default.NOT_FOUND, "User not found");
     }
-    const isUserExist = yield user_model_1.User.findById(decodedToken.userId);
-    if (!isUserExist) {
-        throw new AppError_1.default(401, "User does not exist");
+    if (!user.password) {
+        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "You have not set a password yet. Use set-password instead.");
     }
-    const hashedPassword = yield bcryptjs_1.default.hash(payload.newPassword, Number(env_1.envVars.BCRYPT_SALT_ROUND));
-    isUserExist.password = hashedPassword;
-    yield isUserExist.save();
-});
-const forgotPassword = (email) => __awaiter(void 0, void 0, void 0, function* () {
-    const isUserExist = yield user_model_1.User.findOne({ email });
-    if (!isUserExist) {
-        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "User does not exist");
+    const isOldPasswordMatch = yield bcryptjs_1.default.compare(oldPassword, user.password);
+    if (!isOldPasswordMatch) {
+        throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Old password does not match");
     }
-    if (isUserExist.isActive === user_interface_1.IsActive.BLOCKED ||
-        isUserExist.isActive === user_interface_1.IsActive.INACTIVE) {
-        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, `User is ${isUserExist.isActive}`);
+    const isSamePassword = yield bcryptjs_1.default.compare(newPassword, user.password);
+    if (isSamePassword) {
+        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "New password must be different from old password");
     }
-    if (isUserExist.isDeleted) {
-        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "User is deleted");
-    }
-    const jwtPayload = {
-        userId: isUserExist._id,
-        email: isUserExist.email,
-        role: isUserExist.role,
-    };
-    const resetToken = jsonwebtoken_1.default.sign(jwtPayload, env_1.envVars.JWT_ACCESS_SECRET, {
-        expiresIn: "10m",
-    });
-    const resetUILink = `${env_1.envVars.FRONTEND_URL}/reset-password?id=${isUserExist._id}&token=${resetToken}`;
-    (0, sendEmail_1.sendEmail)({
-        to: isUserExist.email,
-        subject: "Password Reset",
-        templateName: "forgetPassword",
-        templateData: {
-            name: isUserExist.name,
-            resetUILink,
-        },
-    });
+    user.password = yield bcryptjs_1.default.hash(newPassword, Number(env_1.envVars.BCRYPT_SALT_ROUND));
+    // পুরনো session invalidate করো
+    user.refreshToken = undefined;
+    yield user.save();
 });
 const setPassword = (userId, plainPassword) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield user_model_1.User.findById(userId);
+    const user = yield user_model_1.User.findById(userId).select("+password");
     if (!user) {
-        throw new AppError_1.default(404, "User not found");
+        throw new AppError_1.default(http_status_codes_1.default.NOT_FOUND, "User not found");
     }
-    if (user.password &&
-        user.auths.some((providerObject) => providerObject.provider === "google")) {
-        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "You have already set you password. Now you can change the password from your profile password update");
+    if (user.password) {
+        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "Password already set. Use change-password instead.");
+    }
+    const hasCredentials = user.auths.some((a) => a.provider === "credentials");
+    if (hasCredentials) {
+        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "Credentials already linked to this account");
     }
     const hashedPassword = yield bcryptjs_1.default.hash(plainPassword, Number(env_1.envVars.BCRYPT_SALT_ROUND));
     const credentialProvider = {
         provider: "credentials",
         providerId: user.email,
     };
-    const auths = [...user.auths, credentialProvider];
     user.password = hashedPassword;
-    user.auths = auths;
+    user.auths = [...user.auths, credentialProvider];
     yield user.save();
 });
-const changePassword = (oldPassword, newPassword, decodedToken) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield user_model_1.User.findById(decodedToken.userId);
-    const isOldPasswordMatch = yield bcryptjs_1.default.compare(oldPassword, user.password);
-    if (!isOldPasswordMatch) {
-        throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Old Password does not match");
+const forgotPassword = (email) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield user_model_1.User.findOne({ email });
+    if (!user) {
+        throw new AppError_1.default(http_status_codes_1.default.NOT_FOUND, "User does not exist");
     }
-    user.password = yield bcryptjs_1.default.hash(newPassword, Number(env_1.envVars.BCRYPT_SALT_ROUND));
-    user.save();
+    if (user.isActive === user_interface_1.IsActive.BLOCKED ||
+        user.isActive === user_interface_1.IsActive.INACTIVE) {
+        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, `User is ${user.isActive}`);
+    }
+    if (user.isDeleted) {
+        throw new AppError_1.default(http_status_codes_1.default.BAD_REQUEST, "User is deleted");
+    }
+    const jwtPayload = {
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+    };
+    const resetToken = jsonwebtoken_1.default.sign(jwtPayload, env_1.envVars.JWT_RESET_PASSWORD_SECRET, {
+        expiresIn: env_1.envVars.JWT_RESET_PASSWORD_EXPIRES,
+    });
+    const resetUILink = `${env_1.envVars.FRONTEND_URL}/reset-password?id=${user._id}&token=${resetToken}`;
+    yield (0, sendEmail_1.sendEmail)({
+        to: user.email,
+        subject: "Password Reset",
+        templateName: "forgetPassword",
+        templateData: {
+            name: user.name,
+            resetUILink,
+        },
+    });
+});
+const resetPassword = (payload) => __awaiter(void 0, void 0, void 0, function* () {
+    let decoded;
+    try {
+        decoded = jsonwebtoken_1.default.verify(payload.token, env_1.envVars.JWT_RESET_PASSWORD_SECRET);
+    }
+    catch (_a) {
+        throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Invalid or expired reset token");
+    }
+    if (decoded.userId !== payload.id) {
+        throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "Invalid reset token");
+    }
+    const user = yield user_model_1.User.findById(decoded.userId).select("+password");
+    if (!user) {
+        throw new AppError_1.default(http_status_codes_1.default.NOT_FOUND, "User not found");
+    }
+    if (user.isActive === user_interface_1.IsActive.BLOCKED ||
+        user.isActive === user_interface_1.IsActive.INACTIVE) {
+        throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, `User is ${user.isActive}`);
+    }
+    if (user.isDeleted) {
+        throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, "User is deleted");
+    }
+    user.password = yield bcryptjs_1.default.hash(payload.newPassword, Number(env_1.envVars.BCRYPT_SALT_ROUND));
+    // পুরনো session invalidate করো
+    user.refreshToken = undefined;
+    yield user.save();
 });
 exports.AuthServices = {
-    credentialsLogin,
     getNewAccessToken,
     changePassword,
     setPassword,

@@ -23,7 +23,7 @@ const user_interface_1 = require("./user.interface");
 const user_model_1 = require("./user.model");
 const createUser = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     const email = payload.email.trim().toLowerCase();
-    const isUserExist = yield user_model_1.User.findOne({ email }).select("+password");
+    const isUserExist = yield user_model_1.User.exists({ email });
     if (isUserExist) {
         throw new AppError_1.default(http_status_codes_1.default.CONFLICT, "An account with this email already exists.");
     }
@@ -49,7 +49,7 @@ const createUser = (payload) => __awaiter(void 0, void 0, void 0, function* () {
         });
         // Explicitly return only safe fields.
         return {
-            _id: user._id,
+            _id: user.id,
             name: user.name,
             email: user.email,
             phone: user.phone,
@@ -58,6 +58,7 @@ const createUser = (payload) => __awaiter(void 0, void 0, void 0, function* () {
             role: user.role,
             isActive: user.isActive,
             createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
         };
     }
     catch (error) {
@@ -74,7 +75,7 @@ const createUser = (payload) => __awaiter(void 0, void 0, void 0, function* () {
 const updateUser = (userId, payload, decodedToken) => __awaiter(void 0, void 0, void 0, function* () {
     if (decodedToken.role === user_interface_1.Role.USER || decodedToken.role === user_interface_1.Role.GUIDE) {
         if (userId !== decodedToken.userId) {
-            throw new AppError_1.default(401, "You are not authorized");
+            throw new AppError_1.default(http_status_codes_1.default.UNAUTHORIZED, "You are not authorized");
         }
     }
     const ifUserExist = yield user_model_1.User.findById(userId);
@@ -89,11 +90,18 @@ const updateUser = (userId, payload, decodedToken) => __awaiter(void 0, void 0, 
         if (decodedToken.role === user_interface_1.Role.USER || decodedToken.role === user_interface_1.Role.GUIDE) {
             throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, "You are not authorized");
         }
+        if (decodedToken.role === user_interface_1.Role.ADMIN && payload.role === user_interface_1.Role.SUPER_ADMIN) {
+            throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, "Only SUPER_ADMIN can assign SUPER_ADMIN role");
+        }
     }
-    if (payload.isActive || payload.isDeleted) {
+    if (payload.isActive !== undefined || payload.isDeleted !== undefined) {
         if (decodedToken.role === user_interface_1.Role.USER || decodedToken.role === user_interface_1.Role.GUIDE) {
             throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, "You are not authorized");
         }
+    }
+    if (decodedToken.role === user_interface_1.Role.ADMIN &&
+        ifUserExist.role === user_interface_1.Role.SUPER_ADMIN) {
+        throw new AppError_1.default(http_status_codes_1.default.FORBIDDEN, "You cannot modify a SUPER_ADMIN account");
     }
     const newUpdatedUser = yield user_model_1.User.findByIdAndUpdate(userId, payload, {
         new: true,
@@ -119,25 +127,20 @@ const getAllUsers = (query) => __awaiter(void 0, void 0, void 0, function* () {
     };
 });
 const getSingleUser = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield user_model_1.User.findById(id).select("-password");
-    return {
-        data: user,
-    };
-});
-// const getMe = async (userId: string) => {
-//   const user = await User.findById(userId).select("-password");
-//   return {
-//     data: user,
-//   };
-// };
-const getMe = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield user_model_1.User.findById(userId).select("-password");
+    const user = yield user_model_1.User.findOne({ _id: id, isDeleted: false }).select("-password -auths");
     if (!user) {
         throw new AppError_1.default(http_status_codes_1.default.NOT_FOUND, "User Not Found");
     }
     return {
         data: user,
     };
+});
+const getMe = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield user_model_1.User.findOne({ _id: userId, isDeleted: false }).select("-password -auths");
+    if (!user) {
+        throw new AppError_1.default(http_status_codes_1.default.NOT_FOUND, "User Not Found");
+    }
+    return user;
 });
 exports.UserServices = {
     createUser,

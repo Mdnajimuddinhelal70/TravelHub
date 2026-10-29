@@ -13,6 +13,9 @@ exports.BookingController = void 0;
 const catchAsync_1 = require("../../utils/catchAsync");
 const sendResponse_1 = require("../../utils/sendResponse");
 const booking_service_1 = require("./booking.service");
+/* ============================================================
+ *  CREATE
+ * ============================================================ */
 const createBooking = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const decodeToken = req.user;
     const booking = yield booking_service_1.BookingService.createBooking(req.body, decodeToken.userId);
@@ -23,17 +26,26 @@ const createBooking = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 
         data: booking,
     });
 }));
+/* ============================================================
+ *  GET MY BOOKINGS
+ * ============================================================ */
 const getUserBookings = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const bookings = yield booking_service_1.BookingService.getUserBookings();
+    const { userId } = req.user;
+    const result = yield booking_service_1.BookingService.getUserBookings(userId, req.query);
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 200,
         success: true,
         message: "Bookings retrieved successfully",
-        data: bookings,
+        data: result.data,
+        meta: result.meta,
     });
 }));
+/* ============================================================
+ *  GET SINGLE
+ * ============================================================ */
 const getSingleBooking = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const booking = yield booking_service_1.BookingService.getBookingById();
+    const user = req.user;
+    const booking = yield booking_service_1.BookingService.getBookingById(req.params.bookingId, { userId: user.userId, role: user.role });
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 200,
         success: true,
@@ -41,23 +53,30 @@ const getSingleBooking = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(vo
         data: booking,
     });
 }));
+/* ============================================================
+ *  GET ALL (admin)
+ * ============================================================ */
 const getAllBookings = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const bookings = yield booking_service_1.BookingService.getAllBookings();
+    const result = yield booking_service_1.BookingService.getAllBookings(req.query);
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 200,
         success: true,
         message: "Bookings retrieved successfully",
-        data: {},
-        // meta: {},
+        data: result.data,
+        meta: result.meta,
     });
 }));
+/* ============================================================
+ *  UPDATE STATUS
+ * ============================================================ */
 const updateBookingStatus = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const updated = yield booking_service_1.BookingService.updateBookingStatus();
+    const user = req.user;
+    const { status, cancellationReason } = req.body;
+    const updated = yield booking_service_1.BookingService.updateBookingStatus(req.params.bookingId, status, { userId: user.userId, role: user.role }, cancellationReason);
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 200,
         success: true,
-        message: "Booking Status Updated Successfully",
+        message: "Booking status updated successfully",
         data: updated,
     });
 }));

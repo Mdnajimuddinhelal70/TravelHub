@@ -48,6 +48,13 @@ exports.updateUserZodSchema = zod_1.z
         .trim()
         .regex(/^(?:\+8801\d{9}|01\d{9})$/, "Phone number must be +8801XXXXXXXXX or 01XXXXXXXXX.")
         .optional(),
+    picture: zod_1.z
+        .string()
+        .trim()
+        .url("Picture must be a valid URL")
+        .max(500)
+        .refine((url) => url.startsWith("https://res.cloudinary.com/"), "Picture must be uploaded via our system")
+        .optional(),
     address: zod_1.z
         .string()
         .trim()

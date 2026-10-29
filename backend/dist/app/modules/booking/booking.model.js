@@ -1,82 +1,163 @@
 "use strict";
-// import { model, Schema } from "mongoose";
-// import { BOOKING_STATUS, IBooking } from "./booking.interface";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Booking = void 0;
-// const bookingSchema = new Schema<IBooking>(
-//   {
-//     user: {
-//       type: Schema.Types.ObjectId,
-//       ref: "User",
-//       required: true,
-//     },
-//     tour: {
-//       type: Schema.Types.ObjectId,
-//       ref: "Tour",
-//       required: true,
-//     },
-//     payment: {
-//       type: Schema.Types.ObjectId,
-//       ref: "Payment",
-//     },
-//     status: {
-//       type: String,
-//       enum: Object.values(BOOKING_STATUS),
-//       default: BOOKING_STATUS.PENDING,
-//     },
-//     guestCount: {
-//       type: Number,
-//       required: true,
-//     },
-//   },
-//   {
-//     timestamps: true,
-//   },
-// );
-// export const Booking = model<IBooking>("Booking", bookingSchema);
 const mongoose_1 = require("mongoose");
 const booking_interface_1 = require("./booking.interface");
+const travelerSchema = new mongoose_1.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    age: {
+        type: Number,
+        required: true,
+        min: 0,
+        max: 120,
+    },
+    gender: {
+        type: String,
+        enum: ["male", "female", "other"],
+        required: true,
+    },
+    type: {
+        type: String,
+        enum: ["adult", "child"],
+        required: true,
+    },
+    nidOrPassport: {
+        type: String,
+        trim: true,
+    },
+}, { _id: false });
+const contactInfoSchema = new mongoose_1.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    phone: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    email: {
+        type: String,
+        required: true,
+        trim: true,
+        lowercase: true,
+    },
+    emergencyContact: {
+        type: String,
+        trim: true,
+    },
+}, { _id: false });
+const priceBreakdownSchema = new mongoose_1.Schema({
+    adultPrice: {
+        type: Number,
+        required: true,
+        min: 0,
+    },
+    childPrice: {
+        type: Number,
+        min: 0,
+    },
+    adultCount: {
+        type: Number,
+        required: true,
+        min: 1,
+    },
+    childCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    subtotal: {
+        type: Number,
+        required: true,
+        min: 0,
+    },
+    discountAmount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    total: {
+        type: Number,
+        required: true,
+        min: 0,
+    },
+}, { _id: false });
+/* ============================================================
+ *  BOOKING SCHEMA
+ * ============================================================ */
 const bookingSchema = new mongoose_1.Schema({
+    bookingNumber: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        index: true,
+    },
     user: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "User",
         required: true,
-        index: true,
+    },
+    tour: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "Tour",
+        required: true,
     },
     tourDeparture: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "TourDeparture",
         required: true,
-        index: true,
     },
     payment: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "Payment",
     },
+    travelers: {
+        type: [travelerSchema],
+        required: true,
+        validate: {
+            validator: (v) => v.length > 0,
+            message: "At least one traveler is required",
+        },
+    },
+    adultCount: {
+        type: Number,
+        required: true,
+        min: 1,
+    },
+    childCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
     guestCount: {
         type: Number,
         required: true,
-        min: [1, "Guest count must be at least 1."],
-        validate: {
-            validator: Number.isInteger,
-            message: "Guest count must be an integer.",
-        },
+        min: 1,
     },
-    pricePerPerson: {
-        type: Number,
+    contactInfo: {
+        type: contactInfoSchema,
         required: true,
-        min: [0.01, "Price must be greater than zero."],
     },
-    totalAmount: {
-        type: Number,
+    priceBreakdown: {
+        type: priceBreakdownSchema,
         required: true,
-        min: [0.01, "Total amount must be greater than zero."],
+    },
+    couponCode: {
+        type: String,
+        trim: true,
+        uppercase: true,
     },
     status: {
         type: String,
         enum: Object.values(booking_interface_1.BOOKING_STATUS),
         default: booking_interface_1.BOOKING_STATUS.PENDING,
-        required: true,
     },
     reservationExpiresAt: {
         type: Date,
@@ -87,9 +168,49 @@ const bookingSchema = new mongoose_1.Schema({
     cancelledAt: {
         type: Date,
     },
+    cancellationReason: {
+        type: String,
+        trim: true,
+    },
+    specialRequests: {
+        type: String,
+        trim: true,
+    },
 }, {
     timestamps: true,
     versionKey: false,
 });
+/* ============================================================
+ *  INDEXES
+ * ============================================================ */
+bookingSchema.index({ user: 1, createdAt: -1 });
+bookingSchema.index({ tourDeparture: 1, status: 1 });
 bookingSchema.index({ status: 1, reservationExpiresAt: 1 });
+bookingSchema.index({ tour: 1, status: 1 });
+bookingSchema.index({ status: 1, createdAt: -1 });
+/* ============================================================
+ *  HOOKS
+ * ============================================================ */
+// guestCount = adultCount + childCount — auto sync
+bookingSchema.pre("save", function () {
+    if (this.isModified("adultCount") || this.isModified("childCount")) {
+        this.guestCount = this.adultCount + this.childCount;
+    }
+});
+// Confirmed/Cancelled হলে timestamp সেট
+bookingSchema.pre("save", function () {
+    if (this.isModified("status") &&
+        this.status === booking_interface_1.BOOKING_STATUS.CONFIRMED &&
+        !this.confirmedAt) {
+        this.confirmedAt = new Date();
+    }
+    if (this.isModified("status") &&
+        this.status === booking_interface_1.BOOKING_STATUS.CANCELLED &&
+        !this.cancelledAt) {
+        this.cancelledAt = new Date();
+    }
+});
+/* ============================================================
+ *  MODEL
+ * ============================================================ */
 exports.Booking = (0, mongoose_1.model)("Booking", bookingSchema);

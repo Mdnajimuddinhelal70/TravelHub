@@ -38,10 +38,10 @@ passport_1.default.use(new passport_local_1.Strategy({
         if (isUserExist.isDeleted) {
             return done(null, false, { message: "User is deleted" });
         }
-        const isGoogleAuthenticated = isUserExist.auths.some((providerObjects) => providerObjects.provider == "google");
+        const isGoogleAuthenticated = isUserExist.auths.some((p) => p.provider === "google");
         if (isGoogleAuthenticated && !isUserExist.password) {
             return done(null, false, {
-                message: "You have authenticated through Google. So if you want to login with credentials, then at first login with google and set a password for your Gmail and then you can login with email and password.",
+                message: "You have authenticated through Google. Please login with Google first and set a password, then you can login with email and password.",
             });
         }
         const isPasswordMatched = yield bcryptjs_1.default.compare(password, isUserExist.password);
@@ -51,18 +51,18 @@ passport_1.default.use(new passport_local_1.Strategy({
         return done(null, isUserExist);
     }
     catch (error) {
-        console.log(error);
-        done(error);
+        console.error("Local Strategy Error:", error);
+        return done(error, false);
     }
 })));
 passport_1.default.use(new passport_google_oauth20_1.Strategy({
     clientID: env_1.envVars.GOOGLE_CLIENT_ID,
     clientSecret: env_1.envVars.GOOGLE_CLIENT_SECRET,
     callbackURL: env_1.envVars.GOOGLE_CALLBACK_URL,
-}, (accessToken, refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+}, (_accessToken, _refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
     try {
-        const email = (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0].value;
+        const email = (_b = (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.value;
         if (!email) {
             return done(null, false, { message: "No email found" });
         }
@@ -81,7 +81,7 @@ passport_1.default.use(new passport_google_oauth20_1.Strategy({
             isUserExist = yield user_model_1.User.create({
                 email,
                 name: profile.displayName,
-                picture: (_b = profile.photos) === null || _b === void 0 ? void 0 : _b[0].value,
+                picture: (_d = (_c = profile.photos) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.value,
                 role: user_interface_1.Role.USER,
                 auths: [
                     {
@@ -94,8 +94,8 @@ passport_1.default.use(new passport_google_oauth20_1.Strategy({
         return done(null, isUserExist);
     }
     catch (error) {
-        console.log("Google Strategy Error", error);
-        return done(error);
+        console.error("Google Strategy Error:", error);
+        return done(error, false);
     }
 })));
 passport_1.default.serializeUser((user, done) => {
@@ -107,7 +107,7 @@ passport_1.default.deserializeUser((id, done) => __awaiter(void 0, void 0, void 
         done(null, user);
     }
     catch (error) {
-        console.log(error);
-        done(error);
+        console.error("Deserialize Error:", error);
+        done(error, null);
     }
 }));

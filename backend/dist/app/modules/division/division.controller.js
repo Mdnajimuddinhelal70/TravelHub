@@ -13,57 +13,85 @@ exports.DivisionController = void 0;
 const catchAsync_1 = require("../../utils/catchAsync");
 const sendResponse_1 = require("../../utils/sendResponse");
 const division_service_1 = require("./division.service");
+/* ============================================================
+ *  CREATE
+ * ============================================================ */
 const createDivision = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    console.log(req.file);
-    const payload = Object.assign(Object.assign({}, req.body), { thumbnail: (_a = req.file) === null || _a === void 0 ? void 0 : _a.path });
+    const body = req.body;
+    let districts;
+    if (body.districts) {
+        try {
+            districts = JSON.parse(body.districts);
+        }
+        catch (_b) {
+            districts = body.districts.split(",").map((s) => s.trim());
+        }
+    }
+    const payload = Object.assign(Object.assign({}, req.body), { thumbnail: (_a = req.file) === null || _a === void 0 ? void 0 : _a.path, districts });
     const result = yield division_service_1.DivisionService.createDivision(payload);
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 201,
         success: true,
-        message: "Division created",
+        message: "Division created successfully",
         data: result,
     });
 }));
+/* ============================================================
+ *  GET ALL
+ * ============================================================ */
 const getAllDivisions = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const query = req.query;
-    const result = yield division_service_1.DivisionService.getAllDivisions(query);
+    const result = yield division_service_1.DivisionService.getAllDivisions(req.query);
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 200,
         success: true,
-        message: "Divisions retrieved",
+        message: "Divisions retrieved successfully",
         data: result.data,
         meta: result.meta,
     });
 }));
+/* ============================================================
+ *  GET SINGLE
+ * ============================================================ */
 const getSingleDivision = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const slug = req.params.slug;
     const result = yield division_service_1.DivisionService.getSingleDivision(slug);
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 200,
         success: true,
-        message: "Divisions retrieved",
+        message: "Division retrieved successfully",
         data: result.data,
     });
 }));
+/* ============================================================
+ *  UPDATE
+ * ============================================================ */
 const updateDivision = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const id = req.params.id;
-    const payload = Object.assign(Object.assign({}, req.body), { thumbnail: (_a = req.file) === null || _a === void 0 ? void 0 : _a.path });
+    const payload = Object.assign({}, req.body);
+    // ✅ file না থাকলে thumbnail field-এ হাত দেবেন না
+    if ((_a = req.file) === null || _a === void 0 ? void 0 : _a.path) {
+        payload.thumbnail = req.file.path;
+    }
     const result = yield division_service_1.DivisionService.updateDivision(id, payload);
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 200,
         success: true,
-        message: "Division updated",
+        message: "Division updated successfully",
         data: result,
     });
 }));
+/* ============================================================
+ *  DELETE
+ * ============================================================ */
 const deleteDivision = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield division_service_1.DivisionService.deleteDivision(req.params.id);
+    const id = req.params.id;
+    const result = yield division_service_1.DivisionService.deleteDivision(id);
     (0, sendResponse_1.sendResponse)(res, {
         statusCode: 200,
         success: true,
-        message: "Division deleted",
+        message: "Division deleted successfully",
         data: result,
     });
 }));

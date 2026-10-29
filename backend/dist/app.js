@@ -14,7 +14,6 @@ const globalErrorHandler_1 = require("./app/middlewares/globalErrorHandler");
 const notFound_1 = __importDefault(require("./app/middlewares/notFound"));
 const router_1 = require("./app/router");
 const app = (0, express_1.default)();
-app.use((0, cookie_parser_1.default)());
 app.use((0, express_session_1.default)({
     secret: env_1.envVars.EXPRESS_SESSION_SECRET,
     resave: false,

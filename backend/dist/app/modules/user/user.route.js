@@ -4,6 +4,7 @@ exports.UserRoutes = void 0;
 const express_1 = require("express");
 const user_controller_1 = require("./user.controller");
 const user_interface_1 = require("./user.interface");
+const multer_config_1 = require("../../config/multer.config");
 const checkAuth_1 = require("../../middlewares/checkAuth");
 const validateRequest_1 = require("../../middlewares/validateRequest");
 const user_validation_1 = require("./user.validation");
@@ -13,4 +14,5 @@ router.get("/all-users", (0, checkAuth_1.checkAuth)(user_interface_1.Role.ADMIN,
 router.get("/me", (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.Role)), user_controller_1.UserControllers.getMe);
 router.get("/:id", (0, checkAuth_1.checkAuth)(user_interface_1.Role.ADMIN, user_interface_1.Role.SUPER_ADMIN), user_controller_1.UserControllers.getSingleUser);
 router.patch("/:id", (0, validateRequest_1.validateRequest)(user_validation_1.updateUserZodSchema), (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.Role)), user_controller_1.UserControllers.updateUser);
+router.patch("/me/profile-picture", (0, checkAuth_1.checkAuth)(...Object.values(user_interface_1.Role)), multer_config_1.multerUpload.single("file"), user_controller_1.UserControllers.uploadProfilePicture);
 exports.UserRoutes = router;

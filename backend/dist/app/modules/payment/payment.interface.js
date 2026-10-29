@@ -1,8 +1,6 @@
 "use strict";
-// /* eslint-disable @typescript-eslint/no-explicit-any */
-// import { Types } from "mongoose";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PAYMENT_STATUS = void 0;
+exports.PAYMENT_GATEWAY = exports.PAYMENT_STATUS = void 0;
 var PAYMENT_STATUS;
 (function (PAYMENT_STATUS) {
     PAYMENT_STATUS["PENDING"] = "PENDING";
@@ -12,3 +10,11 @@ var PAYMENT_STATUS;
     PAYMENT_STATUS["CANCELLED"] = "CANCELLED";
     PAYMENT_STATUS["REFUNDED"] = "REFUNDED";
 })(PAYMENT_STATUS || (exports.PAYMENT_STATUS = PAYMENT_STATUS = {}));
+var PAYMENT_GATEWAY;
+(function (PAYMENT_GATEWAY) {
+    PAYMENT_GATEWAY["SSLCOMMERZ"] = "sslcommerz";
+    PAYMENT_GATEWAY["BKASH"] = "bkash";
+    PAYMENT_GATEWAY["NAGAD"] = "nagad";
+    PAYMENT_GATEWAY["STRIPE"] = "stripe";
+    PAYMENT_GATEWAY["MANUAL"] = "manual";
+})(PAYMENT_GATEWAY || (exports.PAYMENT_GATEWAY = PAYMENT_GATEWAY = {}));
