@@ -3,14 +3,42 @@ import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { DestinationService } from "./destination.service";
 
+/* ============================================================
+ *  HELPER — parse multipart body
+ * ============================================================ */
+const parseBody = (body: Record<string, unknown>) => {
+  const parsed = { ...body };
+
+  if (parsed.isActive !== undefined) {
+    parsed.isActive = parsed.isActive === "true" || parsed.isActive === true;
+  }
+  if (typeof parsed.location === "string" && parsed.location.trim()) {
+    try {
+      parsed.location = JSON.parse(parsed.location);
+    } catch {}
+  }
+
+  return parsed;
+};
+
+/* ============================================================
+ *  CREATE
+ * ============================================================ */
 const createDestination = catchAsync(async (req: Request, res: Response) => {
-  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-  const payload = {
-    ...req.body,
-    thumbnail: req.file?.path ?? req.body.thumbnail,
-    images: files.length > 0 ? files.map((f) => f.path) : req.body.images,
+  const files = req.files as
+    | { [fieldname: string]: Express.Multer.File[] }
+    | undefined;
+
+  const thumbnail = files?.thumbnail?.[0]?.path;
+  const images = files?.images?.map((f) => f.path) ?? [];
+
+  const payload: Record<string, unknown> = {
+    ...parseBody(req.body),
+    thumbnail,
+    images,
   };
-  const result = await DestinationService.createDestination(payload);
+
+  const result = await DestinationService.createDestination(payload as any);
   sendResponse(res, {
     statusCode: 201,
     success: true,
@@ -19,6 +47,9 @@ const createDestination = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/* ============================================================
+ *  GET ALL
+ * ============================================================ */
 const getAllDestinations = catchAsync(async (req: Request, res: Response) => {
   const result = await DestinationService.getAllDestinations(
     req.query as Record<string, string>,
@@ -32,6 +63,9 @@ const getAllDestinations = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/* ============================================================
+ *  GET BY DIVISION
+ * ============================================================ */
 const getDestinationsByDivision = catchAsync(
   async (req: Request, res: Response) => {
     const divisionId = req.params.divisionId as string;
@@ -49,6 +83,9 @@ const getDestinationsByDivision = catchAsync(
   },
 );
 
+/* ============================================================
+ *  GET SINGLE
+ * ============================================================ */
 const getSingleDestination = catchAsync(async (req: Request, res: Response) => {
   const slug = req.params.slug as string;
   const result = await DestinationService.getSingleDestination(slug);
@@ -60,19 +97,27 @@ const getSingleDestination = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/* ============================================================
+ *  UPDATE
+ * ============================================================ */
 const updateDestination = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
 
-  const payload: Record<string, unknown> = { ...req.body };
-  if (req.file?.path) {
-    payload.thumbnail = req.file.path;
+  const files = req.files as
+    | { [fieldname: string]: Express.Multer.File[] }
+    | undefined;
+
+  const payload: Record<string, unknown> = parseBody(req.body);
+
+  // Only override if new files sent
+  if (files?.thumbnail?.[0]?.path) {
+    payload.thumbnail = files.thumbnail[0].path;
   }
-  if (files.length > 0) {
-    payload.images = files.map((f) => f.path);
+  if (files?.images && files.images.length > 0) {
+    payload.images = files.images.map((f) => f.path);
   }
 
-  const result = await DestinationService.updateDestination(id, payload);
+  const result = await DestinationService.updateDestination(id, payload as any);
   sendResponse(res, {
     statusCode: 200,
     success: true,
@@ -81,6 +126,9 @@ const updateDestination = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+/* ============================================================
+ *  DELETE
+ * ============================================================ */
 const deleteDestination = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const result = await DestinationService.deleteDestination(id);

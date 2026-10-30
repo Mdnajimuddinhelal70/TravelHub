@@ -145,6 +145,28 @@ const createBooking = async (payload: Partial<IBooking>, userId: string) => {
   const departureId = payload.tourDeparture;
   const travelers = payload.travelers ?? [];
 
+  // ---------- User check (once) ----------
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found.");
+  }
+
+  // ❌ Admin/Super Admin cannot book
+  if (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Admins cannot book tours. Please use a regular user account.",
+    );
+  }
+
+  // Profile completeness
+  if (!user.phone || !user.address) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Please update your profile before booking a tour.",
+    );
+  }
+
   // ---------- Input validation ----------
   if (!departureId || !mongoose.isValidObjectId(departureId)) {
     throw new AppError(
@@ -177,18 +199,6 @@ const createBooking = async (payload: Partial<IBooking>, userId: string) => {
     throw new AppError(
       httpStatus.BAD_REQUEST,
       "At least one adult traveler is required.",
-    );
-  }
-
-  // ---------- User check ----------
-  const user = await User.findById(userId);
-  if (!user) {
-    throw new AppError(httpStatus.NOT_FOUND, "User not found.");
-  }
-  if (!user.phone || !user.address) {
-    throw new AppError(
-      httpStatus.BAD_REQUEST,
-      "Please update your profile before booking a tour.",
     );
   }
 
@@ -331,7 +341,6 @@ const createBooking = async (payload: Partial<IBooking>, userId: string) => {
       await failSession.commitTransaction();
     } catch (releaseErr) {
       if (failSession.inTransaction()) await failSession.abortTransaction();
-      // release fail হলেও original error-ই throw করি
     } finally {
       await failSession.endSession();
     }
@@ -352,7 +361,6 @@ const createBooking = async (payload: Partial<IBooking>, userId: string) => {
 
   return { paymentUrl, booking };
 };
-
 /* ============================================================
  *  GET USER BOOKINGS
  * ============================================================ */

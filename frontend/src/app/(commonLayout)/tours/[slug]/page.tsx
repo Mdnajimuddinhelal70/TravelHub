@@ -14,6 +14,7 @@ import { notFound } from "next/navigation";
 
 import { getDeparturesByTour } from "@/services/tour-departure/getDeparturesByTour";
 import { getTourBySlug } from "@/services/tour/getTourBySlug";
+import { getMe } from "@/services/user/getMe";
 import type { ITour, ITourDeparture } from "@/types";
 
 const formatPrice = (price: number) =>
@@ -35,7 +36,7 @@ const getCoverImage = (tour: ITour): string =>
   tour.images?.[0] ||
   "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=85";
 
-const getDestinationName = (tour: ITour): string => {
+const getDestinationName = async (tour: ITour): Promise<string> => {
   if (tour.primaryDestination && typeof tour.primaryDestination !== "string") {
     return tour.primaryDestination.name;
   }
@@ -56,6 +57,8 @@ const TourDetailPage = async ({
 }: {
   params: Promise<{ slug: string }>;
 }) => {
+  const user = await getMe();
+  const canBook = user?.role === "USER" || user?.role === "GUIDE";
   const { slug } = await params;
 
   const tour = await getTourBySlug(slug);
@@ -320,12 +323,18 @@ const TourDetailPage = async ({
                       {d.availableSeats} seat
                       {d.availableSeats !== 1 ? "s" : ""} left
                     </p>
-                    <Link
-                      href={`/tours/${tour.slug}/book?departure=${d._id}`}
-                      className="mt-3 flex h-10 w-full items-center justify-center rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 text-xs font-bold text-white shadow-md shadow-sky-500/20 transition hover:-translate-y-0.5 hover:shadow-lg"
-                    >
-                      Book Now
-                    </Link>
+                    {canBook ? (
+                      <Link
+                        href={`/tours/${tour.slug}/book?departure=${d._id}`}
+                      >
+                        Book Now
+                      </Link>
+                    ) : (
+                      <p className="text-xs text-amber-700">
+                        Admins cannot book tours. Please login as a regular
+                        user.
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>

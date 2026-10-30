@@ -109,6 +109,12 @@ export const adminNavItems: NavSection[] = [
         icon: "Shield",
         roles: ["ADMIN"],
       },
+      {
+        title: "Destinations",
+        href: "/admin/dashboard/add-destination",
+        icon: "MapPin",
+        roles: ["ADMIN"],
+      },
     ],
   },
 ];
@@ -139,6 +145,12 @@ export const superAdminNavItems: NavSection[] = [
         title: "Booking Management",
         href: "/admin/dashboard/booking-management",
         icon: "Calendar",
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        title: "Destinations",
+        href: "/admin/dashboard/add-destination",
+        icon: "MapPin",
         roles: ["SUPER_ADMIN"],
       },
     ],
