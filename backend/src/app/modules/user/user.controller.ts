@@ -68,6 +68,16 @@ const getSingleUser = catchAsync(
     });
   },
 );
+const getUserById = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const result = await UserServices.getUserById(id);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "User retrieved successfully",
+    data: result,
+  });
+});
 
 const getMe = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -133,6 +143,30 @@ const hardDeleteUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const softDeleteUser = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.params.id as string;
+  const requester = req.user as JwtPayload;
+  const result = await UserServices.softDeleteUser(userId, requester);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "User soft-deleted successfully",
+    data: result,
+  });
+});
+
+const restoreUser = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.params.id as string;
+  const requester = req.user as JwtPayload;
+  const result = await UserServices.restoreUser(userId, requester);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "User restored successfully",
+    data: result,
+  });
+});
+
 export const UserControllers = {
   createUser,
   getAllUsers,
@@ -141,4 +175,7 @@ export const UserControllers = {
   getMe,
   uploadProfilePicture,
   hardDeleteUser,
+  getUserById,
+  softDeleteUser,
+  restoreUser,
 };

@@ -7,7 +7,7 @@ import AppError from "../../errorHelpers/AppError";
 import { QueryBuilder } from "../../utils/QueryBuilder";
 import { Booking } from "../booking/booking.model";
 import { userSearchableFields } from "./user.constant";
-import { IAuthProvider, IUser, Role } from "./user.interface";
+import { IAuthProvider, IsActive, IUser, Role } from "./user.interface";
 import { User } from "./user.model";
 import { CreateUserInput } from "./user.validation";
 
@@ -172,6 +172,13 @@ const getSingleUser = async (id: string) => {
     data: user,
   };
 };
+const getUserById = async (id: string) => {
+  const user = await User.findById(id).select("-password -refreshToken -auths");
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  }
+  return user;
+};
 
 const getMe = async (userId: string) => {
   const user = await User.findOne({ _id: userId, isDeleted: false }).select(
@@ -224,6 +231,75 @@ const hardDeleteUser = async (userId: string, requester: JwtPayload) => {
 
   return null;
 };
+/* ============================================================
+ *  SOFT DELETE
+ * ============================================================ */
+const softDeleteUser = async (userId: string, requester: JwtPayload) => {
+  const user = await User.findById(userId);
+  if (!user || user.isDeleted) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Cannot delete yourself
+  if (user._id.toString() === requester.userId) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "You cannot delete your own account",
+    );
+  }
+
+  // Cannot soft-delete a SUPER_ADMIN
+  if (user.role === Role.SUPER_ADMIN) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Cannot delete a SUPER_ADMIN account",
+    );
+  }
+
+  // ADMIN cannot delete another ADMIN
+  if (requester.role === Role.ADMIN && user.role === Role.ADMIN) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Admins cannot delete other admins",
+    );
+  }
+
+  await User.findByIdAndUpdate(userId, {
+    isDeleted: true,
+    isActive: IsActive.INACTIVE,
+    refreshToken: undefined,
+  });
+
+  return { message: "User soft-deleted" };
+};
+
+/* ============================================================
+ *  RESTORE
+ * ============================================================ */
+const restoreUser = async (userId: string, requester: JwtPayload) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  }
+  if (!user.isDeleted) {
+    throw new AppError(httpStatus.BAD_REQUEST, "User is not deleted");
+  }
+
+  if (requester.role === Role.ADMIN && user.role === Role.ADMIN) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Admins cannot restore other admins",
+    );
+  }
+
+  const restored = await User.findByIdAndUpdate(
+    userId,
+    { isDeleted: false, isActive: IsActive.ACTIVE },
+    { new: true, runValidators: true },
+  ).select("-password -auths -refreshToken");
+
+  return { user: restored };
+};
 
 export const UserServices = {
   createUser,
@@ -232,4 +308,7 @@ export const UserServices = {
   updateUser,
   getMe,
   hardDeleteUser,
+  getUserById,
+  softDeleteUser,
+  restoreUser,
 };
