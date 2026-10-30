@@ -38,4 +38,10 @@ router.patch(
   multerUpload.single("file"),
   UserControllers.uploadProfilePicture,
 );
+// backend/src/app/modules/user/user.route.ts
+router.delete(
+  "/:id/permanent",
+  checkAuth(Role.SUPER_ADMIN), // শুধু SUPER_ADMIN
+  UserControllers.hardDeleteUser,
+);
 export const UserRoutes = router;

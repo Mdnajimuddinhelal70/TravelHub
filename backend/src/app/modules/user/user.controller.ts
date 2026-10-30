@@ -85,7 +85,6 @@ const uploadProfilePicture = catchAsync(async (req: Request, res: Response) => {
   if (!req.file) {
     throw new AppError(httpStatus.BAD_REQUEST, "No image file provided");
   }
-
   const newPictureUrl = req.file.path || (req.file as any).secure_url;
 
   if (!newPictureUrl) {
@@ -94,29 +93,22 @@ const uploadProfilePicture = catchAsync(async (req: Request, res: Response) => {
       "Failed to upload image",
     );
   }
-
   const userId = (req.user as JwtPayload).userId;
-
   const existingUser = await User.findById(userId);
   if (!existingUser) {
     throw new AppError(httpStatus.NOT_FOUND, "User not found");
   }
-
   const oldPicture = existingUser.picture;
-
   const updatedUser = await User.findByIdAndUpdate(
     userId,
     { picture: newPictureUrl },
     { new: true, runValidators: true },
   ).select("-password -auths -refreshToken");
-
-  // ✅ পুরনো picture delete (fire and forget)
   if (oldPicture && oldPicture !== newPictureUrl) {
     deleteImageFromCLoudinary(oldPicture).catch((err) =>
       console.error("Failed to delete old picture:", err),
     );
   }
-
   sendResponse(res, {
     statusCode: 200,
     success: true,
@@ -128,6 +120,19 @@ const uploadProfilePicture = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const hardDeleteUser = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.params.id as string;
+  const requester = req?.user as JwtPayload;
+
+  await UserServices.hardDeleteUser(userId, requester);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "User permanently deleted",
+    data: null,
+  });
+});
+
 export const UserControllers = {
   createUser,
   getAllUsers,
@@ -135,4 +140,5 @@ export const UserControllers = {
   updateUser,
   getMe,
   uploadProfilePicture,
+  hardDeleteUser,
 };

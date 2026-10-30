@@ -1,9 +1,11 @@
 import bcryptjs from "bcryptjs";
 import httpStatus from "http-status-codes";
 import { JwtPayload } from "jsonwebtoken";
+import { deleteImageFromCLoudinary } from "../../config/cloudinary.config";
 import { envVars } from "../../config/env";
 import AppError from "../../errorHelpers/AppError";
 import { QueryBuilder } from "../../utils/QueryBuilder";
+import { Booking } from "../booking/booking.model";
 import { userSearchableFields } from "./user.constant";
 import { IAuthProvider, IUser, Role } from "./user.interface";
 import { User } from "./user.model";
@@ -180,10 +182,54 @@ const getMe = async (userId: string) => {
   }
   return user;
 };
+
+const hardDeleteUser = async (userId: string, requester: JwtPayload) => {
+  // Only SUPER_ADMIN can hard-delete
+  if (requester.role !== Role.SUPER_ADMIN) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Only SUPER_ADMIN can permanently delete users",
+    );
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  }
+  if (user._id.toString() === requester.userId) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "You cannot delete your own account",
+    );
+  }
+  if (user.role === Role.SUPER_ADMIN) {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Cannot delete a SUPER_ADMIN account",
+    );
+  }
+  const bookingCount = await Booking.countDocuments({ user: userId });
+  if (bookingCount > 0) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      `Cannot permanently delete: this user has ${bookingCount} booking(s). Use soft delete instead.`,
+    );
+  }
+  if (user.picture) {
+    deleteImageFromCLoudinary(user.picture).catch((err) =>
+      console.error("Failed to delete picture:", err),
+    );
+  }
+  await User.findByIdAndDelete(userId);
+
+  return null;
+};
+
 export const UserServices = {
   createUser,
   getAllUsers,
   getSingleUser,
   updateUser,
   getMe,
+  hardDeleteUser,
 };
