@@ -10,6 +10,7 @@ const UserManagementPage = async ({
     search?: string;
     role?: string;
     isActive?: string;
+    isDeleted?: string;
     page?: string;
     limit?: string;
   }>;
@@ -28,6 +29,7 @@ const UserManagementPage = async ({
     search: params.search,
     role: params.role,
     isActive: params.isActive,
+    isDeleted: params.isDeleted,
     page: params.page ?? "1",
     limit: params.limit ?? "15",
     sort: "-createdAt",

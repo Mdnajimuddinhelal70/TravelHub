@@ -24,6 +24,7 @@ export interface UserListFilters {
   search?: string;
   role?: string;
   isActive?: string;
+  isDeleted?: string; // "true" | "false" | undefined
   page?: string;
   limit?: string;
   sort?: string;
@@ -42,6 +43,7 @@ export async function getAllUsers(
     if (filters.search) query.search = filters.search;
     if (filters.role) query.role = filters.role;
     if (filters.isActive) query.isActive = filters.isActive;
+    if (filters.isDeleted !== undefined) query.isDeleted = filters.isDeleted;
 
     const qs = new URLSearchParams(query).toString();
     const res = await serverFetch.get(`/user/all-users?${qs}`);

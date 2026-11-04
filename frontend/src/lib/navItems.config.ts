@@ -1,41 +1,50 @@
 import { NavSection } from "@/types/dashboard.interface";
 import { getDefaultDashboardRoute, UserRole } from "./auth-utils";
 
-export const getCommonNavItems = (role: UserRole): NavSection[] => [
-  {
-    items: [
-      {
-        title: "Visit Website",
-        href: "/",
-        icon: "Home",
-        roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
-      },
-      {
-        title: "Dashboard",
-        href: getDefaultDashboardRoute(role),
-        icon: "LayoutDashboard",
-        roles: [role],
-      },
-      {
-        title: "My Profile",
-        href: "/dashboard/my-profile",
-        icon: "User",
-        roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
-      },
-    ],
-  },
-  {
-    title: "Account",
-    items: [
-      {
-        title: "Change Password",
-        href: "/dashboard/change-password",
-        icon: "Settings",
-        roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
-      },
-    ],
-  },
-];
+export const getCommonNavItems = (role: UserRole): NavSection[] => {
+  const isUser = role === "USER";
+
+  const profileHref = isUser ? "/dashboard/my-profile" : "/my-profile";
+  const passwordHref = isUser
+    ? "/dashboard/change-password"
+    : "/change-password";
+
+  return [
+    {
+      items: [
+        {
+          title: "Visit Website",
+          href: "/",
+          icon: "Home",
+          roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
+        },
+        {
+          title: "Dashboard",
+          href: getDefaultDashboardRoute(role),
+          icon: "LayoutDashboard",
+          roles: [role],
+        },
+        {
+          title: "My Profile",
+          href: profileHref,
+          icon: "User",
+          roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
+        },
+      ],
+    },
+    {
+      title: "Account",
+      items: [
+        {
+          title: "Change Password",
+          href: passwordHref,
+          icon: "Settings",
+          roles: ["SUPER_ADMIN", "ADMIN", "USER", "GUIDE"],
+        },
+      ],
+    },
+  ];
+};
 
 export const userNavItems: NavSection[] = [
   {

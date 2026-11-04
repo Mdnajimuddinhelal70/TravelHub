@@ -4,6 +4,7 @@ import {
   Ban,
   Eye,
   Loader2,
+  RotateCcw,
   Search,
   Shield,
   Trash2,
@@ -14,17 +15,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import HardDeleteModal from "@/components/modules/Admin/User/HardDeleteModal";
+import RoleChangeModal from "@/components/modules/Admin/User/RoleChangeModal";
 import ConfirmModal from "@/components/shared/ConfirmModal";
 import { adminDeleteUser } from "@/services/user/adminDeleteUser";
+import { adminHardDeleteUser } from "@/services/user/adminHardDeleteUser";
+import { adminRestoreUser } from "@/services/user/adminRestoreUser";
 import {
   AdminUserRole,
   AdminUserStatus,
   adminUpdateUser,
 } from "@/services/user/adminUpdateUser";
 import type { IUserListItem, UserRole } from "@/services/user/getAllUsers";
-
 import type { PaginationMeta } from "@/types";
-import RoleChangeModal from "./RoleChangeModal";
 
 const formatDate = (date: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -79,12 +82,16 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
   const [confirmAction, setConfirmAction] = useState<{
     userId: string;
     userName: string;
-    action: "block" | "unblock" | "delete";
+    action: "block" | "unblock" | "delete" | "restore";
   } | null>(null);
+  const [hardDeleteUser, setHardDeleteUser] = useState<IUserListItem | null>(
+    null,
+  );
 
   const currentSearch = searchParams.get("search") ?? "";
   const currentRole = searchParams.get("role") ?? "";
   const currentStatus = searchParams.get("isActive") ?? "";
+  const currentDeleted = searchParams.get("isDeleted") ?? "";
   const [searchInput, setSearchInput] = useState(currentSearch);
 
   const updateQuery = (key: string, value: string) => {
@@ -102,10 +109,9 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
 
   const isSuperAdmin = currentUserRole === "SUPER_ADMIN";
 
-  // Permission checks
   const canManageUser = (u: IUserListItem) => {
-    if (u.role === "SUPER_ADMIN") return false; // nobody except super admin themselves
-    if (u.role === "ADMIN" && !isSuperAdmin) return false; // only super admin manages admins
+    if (u.role === "SUPER_ADMIN") return false;
+    if (u.role === "ADMIN" && !isSuperAdmin) return false;
     return true;
   };
 
@@ -147,7 +153,7 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
     });
   };
 
-  const executeDelete = () => {
+  const executeSoftDelete = () => {
     if (!confirmAction) return;
 
     setUpdatingId(confirmAction.userId);
@@ -161,6 +167,40 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
       }
       setUpdatingId(null);
       setConfirmAction(null);
+    });
+  };
+
+  const executeRestore = () => {
+    if (!confirmAction) return;
+
+    setUpdatingId(confirmAction.userId);
+    startTransition(async () => {
+      const result = await adminRestoreUser(confirmAction.userId);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+      setUpdatingId(null);
+      setConfirmAction(null);
+    });
+  };
+
+  const executeHardDelete = () => {
+    if (!hardDeleteUser) return;
+
+    setUpdatingId(hardDeleteUser._id);
+    startTransition(async () => {
+      const result = await adminHardDeleteUser(hardDeleteUser._id);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+      setUpdatingId(null);
+      setHardDeleteUser(null);
     });
   };
 
@@ -191,10 +231,17 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
         };
       case "delete":
         return {
-          title: "Delete user",
-          message: `Delete "${confirmAction.userName}"? This is a soft delete and cannot be easily undone.`,
-          label: "Delete user",
+          title: "Soft delete user",
+          message: `Soft-delete "${confirmAction.userName}"? You can restore them later.`,
+          label: "Delete",
           variant: "danger" as const,
+        };
+      case "restore":
+        return {
+          title: "Restore user",
+          message: `Restore "${confirmAction.userName}"? They'll be able to log in again.`,
+          label: "Restore",
+          variant: "primary" as const,
         };
     }
   };
@@ -218,7 +265,7 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
             />
           </form>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={currentRole}
               onChange={(e) => updateQuery("role", e.target.value)}
@@ -240,6 +287,17 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
               <option value="BLOCKED">Blocked</option>
+            </select>
+
+            <select
+              value={currentDeleted}
+              onChange={(e) => updateQuery("isDeleted", e.target.value)}
+              className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+            >
+              <option value="">Active only</option>
+              <option value="false">Not deleted</option>
+              <option value="true">Deleted only</option>
+              <option value="">All</option>
             </select>
           </div>
         </div>
@@ -263,9 +321,15 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
                     const isUpdating = updatingId === u._id && isPending;
                     const manageable = canManageUser(u);
                     const isBlocked = u.isActive === "BLOCKED";
+                    const isDeleted = !!u.isDeleted;
 
                     return (
-                      <tr key={u._id} className="hover:bg-slate-50/50">
+                      <tr
+                        key={u._id}
+                        className={`hover:bg-slate-50/50 ${
+                          isDeleted ? "opacity-60" : ""
+                        }`}
+                      >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-100 to-violet-100 text-xs font-extrabold text-sky-700">
@@ -283,6 +347,11 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
                             <div className="min-w-0">
                               <p className="truncate text-sm font-bold text-slate-900">
                                 {u.name}
+                                {isDeleted && (
+                                  <span className="ml-2 rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-rose-700">
+                                    Deleted
+                                  </span>
+                                )}
                               </p>
                               <p className="truncate text-[11px] text-slate-500">
                                 {u.email}
@@ -321,7 +390,7 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
                               <Eye className="h-3.5 w-3.5" />
                             </Link>
 
-                            {manageable && (
+                            {manageable && !isDeleted && (
                               <>
                                 <button
                                   type="button"
@@ -370,10 +439,46 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
                                   }
                                   disabled={isUpdating}
                                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                  title="Delete"
+                                  title="Soft delete"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
+                              </>
+                            )}
+
+                            {manageable && isDeleted && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setConfirmAction({
+                                      userId: u._id,
+                                      userName: u.name,
+                                      action: "restore",
+                                    })
+                                  }
+                                  disabled={isUpdating}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  title="Restore user"
+                                >
+                                  {isUpdating ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+
+                                {isSuperAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setHardDeleteUser(u)}
+                                    disabled={isUpdating}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border-2 border-rose-300 bg-rose-100 text-rose-700 transition hover:bg-rose-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                    title="Permanently delete"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -434,7 +539,7 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
         onCancel={() => setRoleModalUser(null)}
       />
 
-      {/* Confirm modal — block/unblock/delete */}
+      {/* Confirm modal — block/unblock/soft-delete/restore */}
       <ConfirmModal
         isOpen={!!confirmAction}
         title={getConfirmContent().title}
@@ -445,7 +550,9 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
         onConfirm={() => {
           if (!confirmAction) return;
           if (confirmAction.action === "delete") {
-            executeDelete();
+            executeSoftDelete();
+          } else if (confirmAction.action === "restore") {
+            executeRestore();
           } else {
             executeStatusToggle(
               confirmAction.action === "block" ? "BLOCKED" : "ACTIVE",
@@ -453,6 +560,16 @@ const UserManagementTable = ({ users, meta, currentUserRole }: Props) => {
           }
         }}
         onCancel={() => setConfirmAction(null)}
+      />
+
+      {/* Hard delete modal */}
+      <HardDeleteModal
+        isOpen={!!hardDeleteUser}
+        userName={hardDeleteUser?.name ?? ""}
+        userEmail={hardDeleteUser?.email ?? ""}
+        isLoading={isPending && hardDeleteUser !== null}
+        onConfirm={executeHardDelete}
+        onCancel={() => setHardDeleteUser(null)}
       />
     </>
   );

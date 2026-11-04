@@ -143,7 +143,14 @@ const updateUser = async (
   return newUpdatedUser;
 };
 const getAllUsers = async (query: Record<string, string>) => {
-  const queryBuilder = new QueryBuilder(User.find(), query);
+  const filter: Record<string, unknown> = {};
+  if (query.isDeleted !== undefined) {
+    filter.isDeleted = query.isDeleted === "true";
+  } else {
+    filter.isDeleted = false;
+  }
+  const queryBuilder = new QueryBuilder(User.find(filter), query);
+
   const usersData = queryBuilder
     .filter()
     .search(userSearchableFields)
@@ -156,10 +163,7 @@ const getAllUsers = async (query: Record<string, string>) => {
     queryBuilder.getMeta(),
   ]);
 
-  return {
-    data,
-    meta,
-  };
+  return { data, meta };
 };
 const getSingleUser = async (id: string) => {
   const user = await User.findOne({ _id: id, isDeleted: false }).select(
