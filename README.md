@@ -4,8 +4,8 @@
 
 ## 📸 Screenshots
 ![Travel Hub Banner](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793897772/Travel1_b0t6qd.png)
-### Super Admin Dashboard
-![Super Admin Dashboard](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793897768/travel4_v860cd.png)
+### Admin Dashboard
+![Super Admin Dashboard](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793902028/travel7_zclclq.png)
 ### Booking Flow
 ![Booking Flow](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793900313/travel6_t3ve4j.png)
 ### Super Admin Dashboard
