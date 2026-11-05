@@ -10,5 +10,10 @@ router.get(
   checkAuth(Role.ADMIN, Role.SUPER_ADMIN),
   AdminController.getStats,
 );
+router.get(
+  "/super-admin-stats",
+  checkAuth(Role.SUPER_ADMIN),
+  AdminController.getSuperAdminStats,
+);
 
 export const AdminRoutes = router;

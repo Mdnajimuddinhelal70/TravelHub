@@ -12,7 +12,17 @@ const getStats = catchAsync(async (req: Request, res: Response) => {
     data: stats,
   });
 });
+const getSuperAdminStats = catchAsync(async (req: Request, res: Response) => {
+  const stats = await AdminService.getSuperAdminStats();
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Super admin stats retrieved successfully",
+    data: stats,
+  });
+});
 
 export const AdminController = {
   getStats,
+  getSuperAdminStats,
 };
