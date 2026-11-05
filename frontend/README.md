@@ -1,36 +1,335 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌍 Travel Hub — Full-Stack Travel Booking Platform
 
-## Getting Started
+> A production-ready, full-stack travel booking platform built with Next.js 16, Node.js, Express, MongoDB, and SSLCommerz payment integration. Features role-based dashboards (User / Guide / Admin / Super Admin), real-time seat reservation, and Cloudinary image management.
 
-First, run the development server:
+![Travel Hub Banner](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793280241/nuodhscrndq-1793280238758-108368330.jfif.jpg)
+
+---
+
+## 🔗 Live Demo
+
+- **Frontend:** [https://travel-hub-kohl-eight.vercel.app/](https://travel-hub-kohl-eight.vercel.app/)
+- **Backend API:** [https://travelhub-backend-xcjz.onrender.com](https://travelhub-backend-xcjz.onrender.com)
+
+**Test Credentials:**
+| Role | Email | Password |
+|---|---|---|
+| Super Admin | super-admin@gmail.com | `Pa$$w0rd!` |
+| Admin | admin@gmail.com | `Pa$$w0rd!` |
+| User | user@gmail.com | `Pa$$w0rd!` |
+
+---
+
+## ✨ Features
+
+### 👤 User Features
+
+- 🔐 Secure authentication (JWT + Google OAuth)
+- 🔍 Browse tours with advanced filters (category, price, rating, search)
+- 📅 View tour details with itinerary, departures, amenities
+- 🎫 Book tours with dynamic traveler forms (adults/children)
+- 💳 Pay securely via SSLCommerz (sandbox + production)
+- 📄 Download PDF invoices automatically sent via email
+- 📊 Track bookings (pending, confirmed, completed, cancelled)
+- ❌ Cancel bookings with automatic seat release
+- 👤 Manage profile + upload profile picture (Cloudinary)
+- 🔑 Change password with session invalidation
+
+### 🛡️ Admin Features
+
+- 📊 Real-time dashboard with revenue, bookings, users, tours stats
+- 🗺️ Full Tour CRUD (create/edit/delete with image upload, dynamic itinerary)
+- 📅 Tour Departure management (dates, seats, pricing, status)
+- 🌍 Division & Destination management with thumbnails
+- 🎫 Booking management (confirm, complete, cancel with reasons)
+- 👥 User management (role change, block/unblock, soft/hard delete)
+- 📈 Recent bookings and new users activity feed
+
+### 👑 Super Admin Features
+
+- 🎨 Premium dashboard with role distribution
+- 🛡️ Admin team management (promote, demote, block, delete)
+- 📊 Platform-wide analytics (revenue this-month, growth trends)
+- ⚡ Quick action cards for all management areas
+- 🔒 Exclusive access to admin management endpoints
+
+### ⚙️ System Features
+
+- 🚦 Role-based access control (USER / GUIDE / ADMIN / SUPER_ADMIN)
+- 🔄 Atomic seat reservation (prevents overbooking)
+- 📝 Soft delete with restore + hard delete with booking guards
+- ⏱️ Auto-expire unpaid reservations (15-min cron)
+- 🎯 Custom 404, Error, and Loading skeletons
+- 📱 Fully responsive UI (mobile → desktop)
+- 🌐 SEO-friendly with server-side rendering
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+
+| Technology                  | Purpose                          |
+| --------------------------- | -------------------------------- |
+| **Next.js 16** (App Router) | React framework with SSR         |
+| **TypeScript**              | Type safety                      |
+| **Tailwind CSS v4**         | Utility-first styling            |
+| **shadcn/ui**               | Pre-built accessible components  |
+| **Lucide React**            | Icon library                     |
+| **Sonner**                  | Toast notifications              |
+| **jose**                    | Edge-compatible JWT verification |
+| **Zod**                     | Form validation                  |
+
+### Backend
+
+| Technology              | Purpose                                  |
+| ----------------------- | ---------------------------------------- |
+| **Node.js + Express**   | REST API server                          |
+| **TypeScript**          | Type safety                              |
+| **MongoDB + Mongoose**  | NoSQL database & ODM                     |
+| **JWT**                 | Authentication (access + refresh tokens) |
+| **Passport.js**         | Google OAuth strategy                    |
+| **Zod**                 | Request validation                       |
+| **Multer + Cloudinary** | Image upload & storage                   |
+| **Nodemailer**          | Email notifications                      |
+| **PDFKit**              | Invoice generation                       |
+| **SSLCommerz**          | Payment gateway                          |
+
+### DevOps & Deployment
+
+| Technology        | Purpose          |
+| ----------------- | ---------------- |
+| **Vercel**        | Frontend hosting |
+| **Render**        | Backend hosting  |
+| **MongoDB Atlas** | Cloud database   |
+| **Cloudinary**    | CDN for images   |
+
+---
+
+## 🏗️ Architecture
+
+### Folder Structure — Frontend
+
+frontend/
+├── src/
+│ ├── app/ # Next.js App Router
+│ │ ├── (commonLayout)/ # Public routes
+│ │ │ ├── (auth)/ # Login, Register
+│ │ │ ├── tours/ # Tour listing + detail + booking
+│ │ │ ├── payment/ # Success, Fail, Cancel pages
+│ │ │ └── page.tsx # Home
+│ │ ├── (dashboardLayout)/ # Protected routes
+│ │ │ ├── (commonProtectedLayout)/ # Profile, Change Password
+│ │ │ ├── (userDashboardLayout)/ # User dashboard
+│ │ │ ├── admin/ # Admin dashboards
+│ │ │ └── super-admin/ # Super Admin dashboard
+│ │ ├── not-found.tsx # 404 page
+│ │ └── error.tsx # Error boundary
+│ ├── components/
+│ │ ├── modules/ # Feature-based components
+│ │ ├── shared/ # Reusable (Modals, Skeletons)
+│ │ └── ui/ # shadcn components
+│ ├── services/ # Server actions (API calls)
+│ ├── types/ # TypeScript interfaces
+│ ├── lib/ # Utilities, providers, proxy
+│ └── proxy.ts # Route middleware (Next.js 16)
+
+### Folder Structure — Backend
+
+backend/
+├── src/
+│ ├── app/
+│ │ ├── modules/
+│ │ │ ├── auth/ # Login, OAuth, password reset
+│ │ │ ├── user/ # User CRUD, soft/hard delete
+│ │ │ ├── tour/ # Tour + TourType
+│ │ │ ├── tour-departure/ # Departure management
+│ │ │ ├── booking/ # Booking + seat logic
+│ │ │ ├── payment/ # SSLCommerz integration
+│ │ │ ├── division/ # Division management
+│ │ │ ├── destination/ # Destination management
+│ │ │ └── admin/ # Admin stats endpoints
+│ │ ├── middlewares/ # Auth, validation, errors
+│ │ ├── config/ # Env, DB, Cloudinary, Multer
+│ │ └── router/ # Central route registry
+│ └── server.ts # Server entry point
+
+---
+
+## 🔐 Security Features
+
+- ✅ **JWT tokens** (access + refresh with rotation)
+- ✅ **httpOnly cookies** for token storage
+- ✅ **Password hashing** with bcrypt (10 rounds)
+- ✅ **Role-based access control** at route + API level
+- ✅ **Zod validation** on all inputs (client + server)
+- ✅ **CORS with credentials** whitelist
+- ✅ **Rate limiting** on auth endpoints
+- ✅ **Soft delete** prevents foreign key corruption
+- ✅ **Atomic seat reservation** prevents overbooking
+- ✅ **Session invalidation** on password change
+- ✅ **Open redirect protection** on OAuth callback
+
+---
+
+## 💡 Key Technical Decisions
+
+### 1. **Tour vs TourDeparture separation**
+
+Tours are templates; departures are dated instances. This allows:
+
+- Same tour sold on multiple dates
+- Per-date pricing & capacity
+- Correct seat reservation per departure
+
+### 2. **Atomic seat reservation**
+
+Uses MongoDB `$inc` with `$gte` condition inside transactions to prevent overbooking under concurrent bookings.
+
+### 3. **Booking number generation**
+
+Atomic counter collection generates sequential daily booking numbers (`TH-YYYYMMDD-0001`) without race conditions.
+
+### 4. **Payment verification flow**
+
+User → SSLCommerz → Backend webhook → Verify → Booking CONFIRMED → Invoice email
+
+Never trusts client-side "payment success" signals.
+
+### 5. **Soft vs Hard delete**
+
+- **Soft delete** for users/tours (preserves booking references)
+- **Hard delete** only for spam accounts with no bookings (Super Admin only)
+
+### 6. **Next.js 16 proxy.ts (formerly middleware.ts)**
+
+Uses `jose` (edge-compatible) instead of `jsonwebtoken` for JWT verification in the edge runtime.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- MongoDB Atlas account
+- Cloudinary account
+- SSLCommerz sandbox account
+- Google OAuth credentials (optional)
+
+### 1. Clone the repository
 
 ```bash
+git clone https://github.com/Mdnajimuddinhelal70/TravelHub.git
+cd TravelHub
+
+cd backend
+npm install
+# Create .env
+cp .env.example .env
+# Add your credentials
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd frontend
+npm install
+# Create .env
+cp .env.example .env
+# Add NEXT_PUBLIC_BASE_API_URL and JWT_ACCESS_SECRET
+npm run dev
+
+
+Backend (.env)
+NODE_ENV=development
+PORT=5000
+DB_URL=mongodb+srv://...
+FRONTEND_URL=http://localhost:3000
+
+# JWT
+JWT_ACCESS_SECRET=...
+JWT_ACCESS_EXPIRES=1d
+JWT_REFRESH_SECRET=...
+JWT_REFRESH_EXPIRES=30d
+JWT_RESET_PASSWORD_SECRET=...
+JWT_RESET_PASSWORD_EXPIRES=10m
+BCRYPT_SALT_ROUND=10
+EXPRESS_SESSION_SECRET=...
+
+# Google OAuth
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/v1/auth/google/callback
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+
+# Email
+EMAIL_SENDER_EMAIL=...
+EMAIL_SENDER_APP_PASS=...
+EMAIL_SENDER_SERVICE=gmail
+
+# SSLCommerz
+SSL_STORE_ID=...
+SSL_STORE_PASS=...
+SSL_PAYMENT_API=https://sandbox.sslcommerz.com/gwprocess/v4/api.php
+SSL_VALIDATION_API=https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php
+SSL_IPN_URL=http://localhost:5000/api/v1/payment/validate-payment
+SSL_SUCCESS_BACKEND_URL=http://localhost:5000/api/v1/payment/success
+SSL_FAIL_BACKEND_URL=http://localhost:5000/api/v1/payment/fail
+SSL_CANCEL_BACKEND_URL=http://localhost:5000/api/v1/payment/cancel
+SSL_SUCCESS_FRONTEND_URL=http://localhost:3000/payment/success
+SSL_FAIL_FRONTEND_URL=http://localhost:3000/payment/fail
+SSL_CANCEL_FRONTEND_URL=http://localhost:3000/payment/cancel
+
+
+Frontend (.env)
+NEXT_PUBLIC_BASE_API_URL=http://localhost:5000/api/v1
+JWT_ACCESS_SECRET=...   # Must match backend
+
+***Tested payment cards (SSLCommerz sandbox):
+VISA: 4111111111111111, Expiry: 12/25, CVV: 123,
+
+
+📊 Project Stats
+Total files: 200+
+Lines of code: 15,000+
+Modules: 10 backend modules + 8 frontend features
+API endpoints: 50+
+Roles: 4 (User, Guide, Admin, Super Admin)
+Build time: ~76s (frontend), ~4s (backend)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+🎯 What I Learned
+Building Travel Hub taught me:
+State management — React Server Components vs client components
+Atomicity in DB — MongoDB transactions + $inc for seat reservation
+Payment integration — Never trust client; always verify via webhook
+Role-based routing — Edge middleware with role-based access in Next.js 16
+Soft delete patterns — Preserving foreign key integrity
+Cloudinary + Multer — Buffer uploads vs multipart forms
+TypeScript strict mode — Catching real bugs at compile time
+Production deployment — Render + Vercel + environment mismatches
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+📞 Contact
+Md Najim Uddin Helal
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+📧 Email: najimuddin77288@gmail.com
+💼 LinkedIn: https://www.linkedin.com/in/najim-uddin-7994a1363/
+🐙 GitHub: github.com/Mdnajimuddinhelal70
+🌐 Portfolio: [https://najim-uddin.vercel.app](https://najim-uddin.vercel.app/)
 
-## Learn More
+📜 License
+This project is licensed under the MIT License — feel free to use it as a learning reference.
 
-To learn more about Next.js, take a look at the following resources:
+🙏 Acknowledgments
+SSLCommerz for payment gateway sandbox
+Cloudinary for image hosting
+shadcn for beautiful UI components
+Vercel + Render for free deployment tiers
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+<div align="center">
+⭐ If you found this project useful, please give it a star! ⭐
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Made with ❤️ by Md Najim Uddin Helal
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+</div> ```
