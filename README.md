@@ -174,37 +174,25 @@ backend/
 
 ## 💡 Key Technical Decisions
 
-### 1. **Tour vs TourDeparture separation**
+## 1. Atomic Seat Reservation (Preventing Overbooking)
+Problem: Two users booking the last seat at the same time would both read "1 seat left" and both succeed — classic race condition.
+Decision: Seat decrement uses a conditional $inc inside a MongoDB transaction:
 
-Tours are templates; departures are dated instances. This allows:
+findOneAndUpdate(
+  { _id: departureId, availableSeats: { $gte: requestedSeats } },
+  { $inc: { availableSeats: -requestedSeats } },
+  { new: true }
+)
+The $gte guard makes the decrement conditional. If the condition fails, no seat is taken and the transaction aborts.
 
-- Same tour sold on multiple dates
-- Per-date pricing & capacity
-- Correct seat reservation per departure
+Result: Overbooking is impossible under concurrent load, without application-level locks.
 
-### 2. **Atomic seat reservation**
+## 4. Payment Verification via Webhook (Never Trust the Client)
+Problem: A client can fake a "payment success" redirect. Trusting it would confirm unpaid bookings.
 
-Uses MongoDB `$inc` with `$gte` condition inside transactions to prevent overbooking under concurrent bookings.
+Decision: The booking is confirmed only after the backend receives SSLCommerz's IPN/webhook, validates the transaction against SSLCommerz's validation API, and matches the amount and booking ID server-side.
 
-### 3. **Booking number generation**
-
-Atomic counter collection generates sequential daily booking numbers (`TH-YYYYMMDD-0001`) without race conditions.
-
-### 4. **Payment verification flow**
-
-User → SSLCommerz → Backend webhook → Verify → Booking CONFIRMED → Invoice email
-
-Never trusts client-side "payment success" signals.
-
-### 5. **Soft vs Hard delete**
-
-- **Soft delete** for users/tours (preserves booking references)
-- **Hard delete** only for spam accounts with no bookings (Super Admin only)
-
-### 6. **Next.js 16 proxy.ts (formerly middleware.ts)**
-
-Uses `jose` (edge-compatible) instead of `jsonwebtoken` for JWT verification in the edge runtime.
-
+Result: A user cannot obtain a confirmed booking without a real, verified payment. The flow is: User → SSLCommerz → Backend webhook → Verify → CONFIRMED → Invoice email.
 ---
 
 ## 🚀 Getting Started
