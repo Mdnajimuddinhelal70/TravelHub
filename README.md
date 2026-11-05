@@ -2,7 +2,16 @@
 
 > A production-ready, full-stack travel booking platform built with Next.js 16, Node.js, Express, MongoDB, and SSLCommerz payment integration. Features role-based dashboards (User / Guide / Admin / Super Admin), real-time seat reservation, and Cloudinary image management.
 
-![Travel Hub Banner](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793280241/nuodhscrndq-1793280238758-108368330.jfif.jpg)
+## 📸 Screenshots
+![Travel Hub Banner](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793897772/Travel1_b0t6qd.png)
+### Super Admin Dashboard
+![Super Admin Dashboard](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793897768/travel4_v860cd.png)
+### Booking Flow
+![Booking Flow](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793900313/travel6_t3ve4j.png)
+### Super Admin Dashboard
+![Super Admin Dashboard](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793897768/travel4_v860cd.png)
+### Tour Listing
+![Tour Listing](https://res.cloudinary.com/dpgjlcycl/image/upload/v1793897764/travel5_aqueir.png)
 
 ---
 
@@ -275,7 +284,7 @@ NEXT_PUBLIC_BASE_API_URL=http://localhost:5000/api/v1
 JWT_ACCESS_SECRET=...   # Must match backend
 
 ***Tested payment cards (SSLCommerz sandbox):
-VISA: 4111111111111111, Expiry: 12/25, CVV: 123,
+VISA: 4111111111111111, Expiry: 12/25, CVV: 111,
 
 
 📊 Project Stats
