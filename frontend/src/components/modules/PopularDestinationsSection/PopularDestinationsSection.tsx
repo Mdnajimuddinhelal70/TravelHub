@@ -3,77 +3,31 @@ import {
   ArrowRight,
   ArrowUpRight,
   Compass,
-  Heart,
   MapPin,
   Sparkles,
-  Star,
 } from "lucide-react";
 import Link from "next/link";
 
-const destinations = [
-  {
-    id: "bali",
-    name: "Bali",
-    country: "Indonesia",
-    description:
-      "Experience the perfect blend of beaches, culture and adventure in the Island of Gods.",
-    price: "$499",
-    rating: "4.8",
-    reviews: "2.4k",
-    image:
-      "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Beautiful tropical Bali landscape and traditional architecture",
-    gradient: "from-emerald-950/95 via-teal-900/40 to-transparent",
-    accent: "bg-emerald-400",
-  },
-  {
-    id: "switzerland",
-    name: "Switzerland",
-    country: "Interlaken, Switzerland",
-    description:
-      "Majestic mountains, crystal-clear lakes and charming villages await you in Switzerland.",
-    price: "$699",
-    rating: "4.9",
-    reviews: "1.8k",
-    image:
-      "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Scenic Swiss Alps and a spectacular mountain landscape",
-    gradient: "from-blue-950/95 via-sky-900/40 to-transparent",
-    accent: "bg-sky-400",
-  },
-  {
-    id: "santorini",
-    name: "Santorini",
-    country: "Greece",
-    description:
-      "Discover stunning sunsets, whitewashed buildings and endless blue views in the heart of Greece.",
-    price: "$599",
-    rating: "4.8",
-    reviews: "3.2k",
-    image:
-      "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "White buildings and blue domes overlooking the sea in Santorini",
-    gradient: "from-indigo-950/95 via-violet-900/45 to-transparent",
-    accent: "bg-violet-400",
-  },
-  {
-    id: "phi-phi",
-    name: "Phi Phi Islands",
-    country: "Thailand",
-    description:
-      "Explore crystal-clear waters, vibrant marine life and unforgettable island adventures.",
-    price: "$399",
-    rating: "4.7",
-    reviews: "1.6k",
-    image:
-      "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Tropical island resort surrounded by turquoise ocean waters",
-    gradient: "from-teal-950/95 via-emerald-900/40 to-transparent",
-    accent: "bg-teal-400",
-  },
-];
+import { getAllDestinations } from "@/services/destination/getAllDestinations";
 
-const PopularDestinationsSection = () => {
+const getDivisionName = (division: unknown): string => {
+  if (typeof division === "object" && division !== null && "name" in division) {
+    return (division as { name: string }).name;
+  }
+  return "Bangladesh";
+};
+
+const PopularDestinationsSection = async () => {
+  const { destinations } = await getAllDestinations({
+    limit: "4",
+    sort: "-createdAt",
+  });
+
+  // No destinations → section hide
+  if (destinations.length === 0) {
+    return null;
+  }
+
   return (
     <section
       id="popular-destinations"
@@ -122,25 +76,28 @@ const PopularDestinationsSection = () => {
 
         {/* Destination cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-          {destinations.map((destination, index) => (
+          {destinations.map((destination) => (
             <article
-              key={destination.id}
+              key={destination._id}
               className="group relative isolate min-h-[440px] overflow-hidden rounded-[28px] border border-slate-200/70 bg-slate-100 shadow-sm transition-all duration-500 hover:-translate-y-2 hover:border-sky-200 hover:shadow-2xl hover:shadow-slate-300/40 sm:min-h-[460px] lg:min-h-[490px]"
             >
-              {/* Destination image */}
+              {/* Image */}
               <div
                 role="img"
-                aria-label={destination.imageAlt}
+                aria-label={destination.name}
                 className="absolute inset-0 -z-20 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110"
                 style={{
-                  backgroundImage: `url("${destination.image}")`,
+                  backgroundImage: `url("${
+                    destination.thumbnail ||
+                    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85"
+                  }")`,
                 }}
               />
 
               {/* Image overlay */}
               <div
                 aria-hidden="true"
-                className={`pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t ${destination.gradient}`}
+                className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent"
               />
 
               <div
@@ -148,62 +105,44 @@ const PopularDestinationsSection = () => {
                 className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-slate-950/30 via-transparent to-transparent opacity-80"
               />
 
-              {/* Top row */}
+              {/* Top row — Division badge */}
               <div className="absolute inset-x-5 top-5 flex items-start justify-between gap-3">
                 <div className="rounded-2xl border border-white/20 bg-slate-950/35 px-3.5 py-2.5 text-white shadow-lg backdrop-blur-md">
                   <p className="text-[10px] font-medium tracking-wide text-white/80">
-                    Starting from
+                    Division
                   </p>
-
-                  <p className="text-lg font-extrabold tracking-tight">
-                    {destination.price}
+                  <p className="text-sm font-extrabold tracking-tight">
+                    {getDivisionName(destination.division)}
                   </p>
                 </div>
-
-                <button
-                  type="button"
-                  aria-label={`Save ${destination.name} to favorites`}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-slate-950/30 text-white shadow-lg backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-white hover:text-rose-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-                >
-                  <Heart className="h-5 w-5" strokeWidth={1.8} />
-                </button>
               </div>
 
-              {/* Destination content */}
+              {/* Content */}
               <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-6">
                 <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white/90">
                   <MapPin className="h-4 w-4 shrink-0" />
-
-                  <span>{destination.country}</span>
+                  <span className="truncate">{destination.slug}</span>
                 </div>
 
                 <h3 className="text-2xl font-bold tracking-tight sm:text-[27px]">
                   {destination.name}
                 </h3>
 
-                <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/85">
-                  {destination.description}
-                </p>
+                {destination.description && (
+                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/85">
+                    {destination.description}
+                  </p>
+                )}
 
-                {/* Rating and action */}
+                {/* Action */}
                 <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/20 pt-4">
-                  <div className="flex min-w-0 items-center gap-2 text-sm">
-                    <Star
-                      aria-hidden="true"
-                      className="h-4 w-4 shrink-0 fill-amber-300 text-amber-300"
-                    />
-
-                    <span className="font-bold">{destination.rating}</span>
-
-                    <span className="text-white/50">|</span>
-
-                    <span className="truncate text-xs text-white/75">
-                      {destination.reviews} reviews
-                    </span>
-                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white backdrop-blur">
+                    <Sparkles className="h-3 w-3" />
+                    Explore tours
+                  </span>
 
                   <Link
-                    href="/tours"
+                    href={`/tours?search=${encodeURIComponent(destination.name)}`}
                     aria-label={`Explore tours for ${destination.name}`}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-slate-950 shadow-lg transition-all duration-300 hover:scale-110 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                   >
@@ -215,36 +154,31 @@ const PopularDestinationsSection = () => {
               {/* Hover accent */}
               <div
                 aria-hidden="true"
-                className={`absolute bottom-0 left-0 h-1 w-0 ${destination.accent} transition-all duration-500 group-hover:w-full`}
+                className="absolute bottom-0 left-0 h-1 w-0 bg-sky-400 transition-all duration-500 group-hover:w-full"
               />
             </article>
           ))}
         </div>
 
-        {/* Bottom CTA */}
+        {/* Bottom CTA — অপরিবর্তিত */}
         <div className="group/cta relative mt-8 overflow-hidden rounded-[28px] bg-slate-950 px-6 py-8 shadow-xl shadow-slate-900/10 sm:px-9 sm:py-10 lg:mt-10 lg:px-12 lg:py-12">
-          {/* CTA atmosphere */}
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -right-20 -top-32 h-72 w-72 rounded-full bg-sky-500/20 blur-[80px]"
           />
-
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-violet-500/20 blur-[80px]"
           />
-
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -right-10 -bottom-40 h-80 w-80 rounded-full border border-sky-400/10 transition-transform duration-700 group-hover/cta:scale-110"
           />
 
-          {/* CTA content */}
           <div className="relative flex flex-col items-start justify-between gap-7 lg:flex-row lg:items-center">
             <div className="max-w-xl">
               <div className="mb-3 flex items-center gap-2 text-sky-300">
                 <Sparkles className="h-4 w-4" />
-
                 <span className="text-xs font-bold uppercase tracking-[0.18em]">
                   Ready for your next adventure?
                 </span>
@@ -265,7 +199,7 @@ const PopularDestinationsSection = () => {
             </div>
 
             <Link
-              href="/tours"
+              href="/destination"
               className="group inline-flex w-full shrink-0 items-center justify-center gap-3 rounded-xl bg-white px-6 py-4 text-sm font-bold text-slate-950 transition-all duration-300 hover:bg-sky-50 hover:shadow-lg hover:shadow-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:w-auto"
             >
               Explore All Destinations
@@ -277,7 +211,6 @@ const PopularDestinationsSection = () => {
             aria-hidden="true"
             className="pointer-events-none absolute right-5 top-5 h-7 w-7 text-white/10 sm:right-8 sm:top-8 sm:h-9 sm:w-9"
           />
-
           <Compass
             aria-hidden="true"
             className="pointer-events-none absolute bottom-5 right-8 hidden h-24 w-24 rotate-12 text-white/[0.04] transition-transform duration-700 group-hover/cta:rotate-45 sm:block"

@@ -8,71 +8,63 @@ import {
   CalendarDays,
   Clock3,
   MapPin,
+  Sparkles,
   Star,
   Users,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
-const tourPackages = [
-  {
-    id: 1,
-    title: "Discover Bali Paradise",
-    location: "Bali, Indonesia",
-    category: "Beach & Island",
-    duration: "5 Days / 4 Nights",
-    groupSize: "2–8 People",
-    price: 649,
-    rating: 4.9,
-    reviews: 128,
-    badge: "Bestseller",
-    image:
-      "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Beautiful tropical Bali temple surrounded by greenery",
-    featured: true,
-  },
-  {
-    id: 2,
-    title: "Swiss Alpine Escape",
-    location: "Interlaken, Switzerland",
-    category: "Mountain Adventure",
-    duration: "7 Days / 6 Nights",
-    groupSize: "2–10 People",
-    price: 1299,
-    rating: 4.9,
-    reviews: 96,
-    badge: "Popular",
-    image:
-      "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Majestic Swiss alpine mountains and scenic landscape",
-    featured: false,
-  },
-  {
-    id: 3,
-    title: "Maldives Blue Escape",
-    location: "Malé, Maldives",
-    category: "Luxury Getaway",
-    duration: "4 Days / 3 Nights",
-    groupSize: "2–6 People",
-    price: 899,
-    rating: 4.8,
-    reviews: 84,
-    badge: "Limited Offer",
-    image:
-      "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Luxury tropical island resort surrounded by turquoise water",
-    featured: false,
-  },
-];
+import type { ITour } from "@/types";
 
-const FeaturedTourPackagesSection = () => {
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "BDT",
+    maximumFractionDigits: 0,
+  }).format(price);
+
+const getFinalPrice = (tour: ITour): number => {
+  const original = tour.price?.adult ?? 0;
+  const percent = tour.price?.discountPercent ?? 0;
+  return Math.round(original - (original * percent) / 100);
+};
+
+const getDestinationName = (tour: ITour): string => {
+  if (
+    tour.primaryDestination &&
+    typeof tour.primaryDestination === "object" &&
+    tour.primaryDestination !== null
+  ) {
+    return tour.primaryDestination.name;
+  }
+  if (Array.isArray(tour.destinations) && tour.destinations.length > 0) {
+    const first = tour.destinations[0];
+    return typeof first === "string" ? "—" : first.name;
+  }
+  return "—";
+};
+
+const getImage = (tour: ITour): string =>
+  tour.coverImage ||
+  tour.images?.[0] ||
+  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85";
+
+interface Props {
+  tours: ITour[];
+}
+
+const FeaturedTourPackagesSection = ({ tours }: Props) => {
+  // Hide section if no tours
+  if (tours.length === 0) return null;
+
   return (
     <section
       id="featured-tours"
       aria-labelledby="featured-tours-heading"
       className="relative isolate overflow-hidden bg-slate-50 px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28"
     >
-      {/* Background atmosphere */}
+      {/* Background */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
@@ -134,126 +126,157 @@ const FeaturedTourPackagesSection = () => {
 
         {/* Tour cards */}
         <div className="grid grid-cols-1 gap-7 md:grid-cols-2 xl:grid-cols-3">
-          {tourPackages.map((tour, index) => (
-            <motion.article
-              key={tour.id}
-              initial={{ opacity: 0, y: 32 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.15 }}
-              transition={{
-                duration: 0.6,
-                delay: index * 0.12,
-                ease: "easeOut",
-              }}
-              className={`group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] border bg-white shadow-[0_12px_45px_-25px_rgba(15,23,42,0.20)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_28px_65px_-25px_rgba(8,145,178,0.25)] ${
-                tour.featured
-                  ? "border-cyan-200/80"
-                  : "border-slate-200/80 hover:border-cyan-200"
-              }`}
-            >
-              {/* Image */}
-              <div className="relative h-64 overflow-hidden sm:h-72">
-                <Image
-                  src={tour.image}
-                  alt={tour.imageAlt}
-                  fill
-                  sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 33vw"
-                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-                />
+          {tours.map((tour, index) => {
+            const destination = getDestinationName(tour);
+            const finalPrice = getFinalPrice(tour);
+            const originalPrice = tour.price?.adult ?? 0;
+            const hasDiscount = originalPrice > finalPrice;
+            const isNew = tour.rating === 0 && tour.totalReviews === 0;
 
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/10 to-slate-950/10" />
+            return (
+              <motion.article
+                key={tour._id}
+                initial={{ opacity: 0, y: 32 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.15 }}
+                transition={{
+                  duration: 0.6,
+                  delay: index * 0.12,
+                  ease: "easeOut",
+                }}
+                className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_12px_45px_-25px_rgba(15,23,42,0.20)] transition-all duration-500 hover:-translate-y-2 hover:border-cyan-200 hover:shadow-[0_28px_65px_-25px_rgba(8,145,178,0.25)]"
+              >
+                {/* Image */}
+                <div className="relative h-64 overflow-hidden sm:h-72">
+                  <Image
+                    src={getImage(tour)}
+                    alt={tour.title}
+                    fill
+                    sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                  />
 
-                {/* Top badges */}
-                <div className="absolute top-4 right-4 left-4 flex items-start justify-between gap-3">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/90 px-3.5 py-2 text-xs font-bold text-slate-800 shadow-lg backdrop-blur-md">
-                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
-                    {tour.badge}
-                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/10 to-slate-950/10" />
 
-                  <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/35 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md">
-                    <Star size={14} className="fill-amber-400 text-amber-400" />
-                    {tour.rating}
-                    <span className="text-white/70">({tour.reviews})</span>
-                  </div>
-                </div>
-
-                {/* Image caption */}
-                <div className="absolute right-5 bottom-5 left-5">
-                  <span className="mb-3 inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-white backdrop-blur-md">
-                    {tour.category}
-                  </span>
-
-                  <h3 className="text-2xl font-bold tracking-tight text-white sm:text-[1.7rem]">
-                    {tour.title}
-                  </h3>
-
-                  <p className="mt-2 flex items-center gap-1.5 text-sm text-white/85">
-                    <MapPin size={15} className="shrink-0 text-cyan-300" />
-                    {tour.location}
-                  </p>
-                </div>
-              </div>
-
-              {/* Card content */}
-              <div className="flex flex-1 flex-col p-5 sm:p-6">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3 py-3 transition-colors duration-300 group-hover:bg-cyan-50/70">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-100/80 text-cyan-700">
-                      <CalendarDays size={17} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-medium tracking-wide text-slate-500 uppercase">
-                        Duration
-                      </p>
-                      <p className="mt-1 text-xs font-bold text-slate-800">
-                        {tour.duration}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3 py-3 transition-colors duration-300 group-hover:bg-violet-50/70">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100/80 text-violet-700">
-                      <Users size={17} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-medium tracking-wide text-slate-500 uppercase">
-                        Group Size
-                      </p>
-                      <p className="mt-1 text-xs font-bold text-slate-800">
-                        {tour.groupSize}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Price and CTA */}
-                <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-slate-100 pt-5">
-                  <div>
-                    <p className="mb-1 text-xs text-slate-500">Starting from</p>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-extrabold tracking-tight text-slate-950">
-                        ${tour.price.toLocaleString("en-US")}
+                  {/* Top badges */}
+                  <div className="absolute top-4 right-4 left-4 flex items-start justify-between gap-3">
+                    {/* Badge — New or Discount */}
+                    {isNew ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/90 px-3.5 py-2 text-xs font-bold text-cyan-700 shadow-lg backdrop-blur-md">
+                        <Sparkles className="h-3 w-3" />
+                        New
                       </span>
-                      <span className="text-xs font-medium text-slate-500">
-                        / person
+                    ) : hasDiscount ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-rose-500/90 px-3.5 py-2 text-xs font-bold text-white shadow-lg backdrop-blur-md">
+                        -{tour.price.discountPercent}% OFF
                       </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/90 px-3.5 py-2 text-xs font-bold text-slate-800 shadow-lg backdrop-blur-md">
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+                        Featured
+                      </span>
+                    )}
+
+                    {/* Rating (only if > 0) */}
+                    {tour.rating > 0 && (
+                      <div className="flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/35 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md">
+                        <Star
+                          size={14}
+                          className="fill-amber-400 text-amber-400"
+                        />
+                        {tour.rating.toFixed(1)}
+                        <span className="text-white/70">
+                          ({tour.totalReviews})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image caption */}
+                  <div className="absolute right-5 bottom-5 left-5">
+                    {tour.category && (
+                      <span className="mb-3 inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-semibold capitalize tracking-wide text-white backdrop-blur-md">
+                        {tour.category}
+                      </span>
+                    )}
+
+                    <h3 className="text-2xl font-bold tracking-tight text-white sm:text-[1.7rem]">
+                      {tour.title}
+                    </h3>
+
+                    <p className="mt-2 flex items-center gap-1.5 text-sm text-white/85">
+                      <MapPin size={15} className="shrink-0 text-cyan-300" />
+                      {destination}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Card content */}
+                <div className="flex flex-1 flex-col p-5 sm:p-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3 py-3 transition-colors duration-300 group-hover:bg-cyan-50/70">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-100/80 text-cyan-700">
+                        <CalendarDays size={17} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-medium tracking-wide text-slate-500 uppercase">
+                          Duration
+                        </p>
+                        <p className="mt-1 text-xs font-bold text-slate-800">
+                          {tour.duration?.days ?? 0}D /{" "}
+                          {tour.duration?.nights ?? 0}N
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3 py-3 transition-colors duration-300 group-hover:bg-violet-50/70">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100/80 text-violet-700">
+                        <Users size={17} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-medium tracking-wide text-slate-500 uppercase">
+                          Group Size
+                        </p>
+                        <p className="mt-1 text-xs font-bold text-slate-800">
+                          {tour.minGroupSize ?? 1}–{tour.maxGuest ?? 20} People
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <Link
-                    href={`/tours/${tour.id}`}
-                    aria-label={`Explore ${tour.title}`}
-                    className="group/button inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-sky-500 to-violet-600 text-white shadow-lg shadow-cyan-500/20 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-cyan-500/30 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:outline-none"
-                  >
-                    <ArrowDownRight
-                      size={22}
-                      className="transition-transform duration-300 group-hover/button:translate-x-0.5 group-hover/button:translate-y-0.5"
-                    />
-                  </Link>
+                  {/* Price and CTA */}
+                  <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-slate-100 pt-5">
+                    <div>
+                      <p className="mb-1 text-xs text-slate-500">
+                        Starting from
+                      </p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-extrabold tracking-tight text-slate-950">
+                          {formatPrice(finalPrice)}
+                        </span>
+                        {hasDiscount && (
+                          <span className="text-xs font-medium text-slate-400 line-through">
+                            {formatPrice(originalPrice)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/tours/${tour.slug}`}
+                      aria-label={`Explore ${tour.title}`}
+                      className="group/button inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-sky-500 to-violet-600 text-white shadow-lg shadow-cyan-500/20 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-cyan-500/30 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:outline-none"
+                    >
+                      <ArrowDownRight
+                        size={22}
+                        className="transition-transform duration-300 group-hover/button:translate-x-0.5 group-hover/button:translate-y-0.5"
+                      />
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            </motion.article>
-          ))}
+              </motion.article>
+            );
+          })}
         </div>
 
         {/* Bottom CTA */}

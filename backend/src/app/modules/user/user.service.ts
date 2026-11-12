@@ -53,7 +53,6 @@ const createUser = async (payload: CreateUserInput) => {
       auths: [authProvider],
     });
 
-    // Explicitly return only safe fields.
     return {
       _id: user.id,
       name: user.name,
