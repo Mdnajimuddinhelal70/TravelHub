@@ -4,17 +4,30 @@ import { Button } from "@/components/ui/button";
 import { LogIn, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-export default function NavbarActions({
-  onNavigate,
-}: {
+import type { IUserProfile } from "@/services/user/getMe";
+import UserMenu from "./UserMenu";
+
+interface Props {
+  user: IUserProfile | null;
   onNavigate?: () => void;
-}) {
+}
+
+export default function NavbarActions({ user, onNavigate }: Props) {
   const router = useRouter();
 
   const navigate = (href: string) => {
     onNavigate?.();
     router.push(href);
   };
+
+  // ✅ Logged in → UserMenu
+  if (user) {
+    return (
+      <div className="flex items-center gap-2.5">
+        <UserMenu user={user} onNavigate={onNavigate} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2.5">

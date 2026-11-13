@@ -12,129 +12,57 @@ import {
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-const categories = [
-  "All Destinations",
-  "Nature",
-  "Mountains",
-  "Beaches",
-  "Culture",
-] as const;
+import type { IDestination, IDivision } from "@/types";
 
-type DestinationCategory = (typeof categories)[number];
-
-type Destination = {
-  id: number;
-  name: string;
-  country: string;
-  category: Exclude<DestinationCategory, "All Destinations">;
-  description: string;
-  image: string;
-  imageAlt: string;
-  featured?: boolean;
+const getDivisionName = (division: IDestination["division"]): string => {
+  if (typeof division === "object" && division !== null) {
+    return division.name;
+  }
+  return "Bangladesh";
 };
 
-const destinations: Destination[] = [
-  {
-    id: 1,
-    name: "Sylhet",
-    country: "Bangladesh",
-    category: "Nature",
-    description:
-      "Explore lush tea gardens, peaceful rivers, and the refreshing beauty of green landscapes.",
-    image:
-      "https://images.unsplash.com/photo-1472396961693-142e6e269027?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Lush green natural landscape surrounded by trees",
-    featured: true,
-  },
-  {
-    id: 2,
-    name: "Swiss Alps",
-    country: "Switzerland",
-    category: "Mountains",
-    description:
-      "Discover breathtaking mountain scenery, alpine villages, and unforgettable views.",
-    image:
-      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Majestic mountain peaks beneath a clear sky",
-    featured: true,
-  },
-  {
-    id: 3,
-    name: "Bali",
-    country: "Indonesia",
-    category: "Beaches",
-    description:
-      "Find tropical coastlines, peaceful retreats, and beautiful island experiences.",
-    image:
-      "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Tropical Bali landscape with traditional architecture",
-    featured: true,
-  },
-  {
-    id: 4,
-    name: "Kyoto",
-    country: "Japan",
-    category: "Culture",
-    description:
-      "Experience traditional streets, timeless architecture, and rich cultural heritage.",
-    image:
-      "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Traditional Japanese architecture surrounded by greenery",
-  },
-  {
-    id: 5,
-    name: "Banff",
-    country: "Canada",
-    category: "Nature",
-    description:
-      "Escape into crystal-clear lakes, forest trails, and spectacular wilderness.",
-    image:
-      "https://images.unsplash.com/photo-1503614472-8c93d56cd7b5?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Turquoise lake surrounded by dramatic mountain scenery",
-  },
-  {
-    id: 6,
-    name: "Santorini",
-    country: "Greece",
-    category: "Beaches",
-    description:
-      "Enjoy bright coastal views, beautiful island architecture, and Mediterranean charm.",
-    image:
-      "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?auto=format&fit=crop&w=1000&q=85",
-    imageAlt: "Whitewashed buildings overlooking the sea in Santorini",
-  },
-];
+const getDivisionId = (division: IDestination["division"]): string => {
+  if (typeof division === "object" && division !== null) {
+    return division._id;
+  }
+  return division as string;
+};
 
-const ExploreDestinationsSection = () => {
-  const [activeCategory, setActiveCategory] =
-    useState<DestinationCategory>("All Destinations");
+interface Props {
+  destinations: IDestination[];
+  divisions: IDivision[];
+}
+
+const ExploreDestinationsClient = ({ destinations, divisions }: Props) => {
+  const [activeDivision, setActiveDivision] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredDestinations = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     return destinations.filter((destination) => {
-      const matchesCategory =
-        activeCategory === "All Destinations" ||
-        destination.category === activeCategory;
+      const matchesDivision =
+        !activeDivision ||
+        getDivisionId(destination.division) === activeDivision;
 
       const searchableText = [
         destination.name,
-        destination.country,
-        destination.category,
-        destination.description,
+        destination.slug,
+        destination.description ?? "",
+        getDivisionName(destination.division),
       ]
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch = searchableText.includes(normalizedQuery);
+      const matchesSearch =
+        !normalizedQuery || searchableText.includes(normalizedQuery);
 
-      return matchesCategory && matchesSearch;
+      return matchesDivision && matchesSearch;
     });
-  }, [activeCategory, searchQuery]);
+  }, [destinations, activeDivision, searchQuery]);
 
   const resetFilters = () => {
-    setActiveCategory("All Destinations");
+    setActiveDivision("");
     setSearchQuery("");
   };
 
@@ -181,9 +109,10 @@ const ExploreDestinationsSection = () => {
           </p>
         </div>
 
-        {/* Search and filters */}
+        {/* Search + division filter */}
         <div className="mt-10 rounded-3xl border border-white bg-white/85 p-4 shadow-xl shadow-slate-900/[0.04] backdrop-blur-xl sm:p-6 lg:mt-12">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            {/* Search */}
             <div className="relative w-full lg:max-w-md">
               <Search
                 size={19}
@@ -200,7 +129,7 @@ const ExploreDestinationsSection = () => {
                 type="search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search by destination or country..."
+                placeholder="Search destinations..."
                 className="h-13 w-full rounded-2xl border border-slate-200 bg-slate-50/70 pr-11 pl-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
               />
 
@@ -216,26 +145,40 @@ const ExploreDestinationsSection = () => {
               )}
             </div>
 
+            {/* Division filter */}
             <div
-              aria-label="Filter destinations by category"
+              aria-label="Filter destinations by division"
               className="flex flex-wrap items-center justify-start gap-2 lg:justify-end"
             >
-              {categories.map((category) => {
-                const isActive = activeCategory === category;
+              <button
+                type="button"
+                aria-pressed={!activeDivision}
+                onClick={() => setActiveDivision("")}
+                className={`rounded-xl px-4 py-2.5 text-xs font-bold transition duration-200 sm:text-sm ${
+                  !activeDivision
+                    ? "bg-gradient-to-r from-sky-600 to-cyan-600 text-white shadow-md shadow-sky-600/20"
+                    : "border border-slate-200 bg-white text-slate-600 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
+                }`}
+              >
+                All Divisions
+              </button>
+
+              {divisions.map((division) => {
+                const isActive = activeDivision === division._id;
 
                 return (
                   <button
-                    key={category}
+                    key={division._id}
                     type="button"
                     aria-pressed={isActive}
-                    onClick={() => setActiveCategory(category)}
+                    onClick={() => setActiveDivision(division._id)}
                     className={`rounded-xl px-4 py-2.5 text-xs font-bold transition duration-200 sm:text-sm ${
                       isActive
                         ? "bg-gradient-to-r from-sky-600 to-cyan-600 text-white shadow-md shadow-sky-600/20"
                         : "border border-slate-200 bg-white text-slate-600 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
                     }`}
                   >
-                    {category}
+                    {division.name}
                   </button>
                 );
               })}
@@ -264,7 +207,7 @@ const ExploreDestinationsSection = () => {
             </p>
           </div>
 
-          {(searchQuery || activeCategory !== "All Destinations") && (
+          {(searchQuery || activeDivision) && (
             <button
               type="button"
               onClick={resetFilters}
@@ -281,17 +224,20 @@ const ExploreDestinationsSection = () => {
           <div className="mt-7 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-7">
             {filteredDestinations.map((destination) => (
               <article
-                key={destination.id}
+                key={destination._id}
                 className="group relative flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/70 bg-white shadow-sm shadow-slate-900/[0.03] transition duration-500 hover:-translate-y-1.5 hover:border-sky-200 hover:shadow-2xl hover:shadow-sky-900/[0.09]"
               >
                 {/* Image */}
                 <div className="relative h-64 overflow-hidden sm:h-72">
                   <div
                     role="img"
-                    aria-label={destination.imageAlt}
+                    aria-label={destination.name}
                     className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110"
                     style={{
-                      backgroundImage: `url("${destination.image}")`,
+                      backgroundImage: `url("${
+                        destination.thumbnail ||
+                        "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85"
+                      }")`,
                     }}
                   />
 
@@ -300,25 +246,16 @@ const ExploreDestinationsSection = () => {
                   <div className="absolute top-4 left-4">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/90 px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm backdrop-blur-md">
                       <Compass size={13} className="text-sky-600" />
-                      {destination.category}
+                      {getDivisionName(destination.division)}
                     </span>
                   </div>
-
-                  {destination.featured && (
-                    <div className="absolute top-4 right-4">
-                      <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-slate-900/30 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md">
-                        <Sparkles size={12} />
-                        Featured
-                      </span>
-                    </div>
-                  )}
 
                   <div className="absolute right-5 bottom-5 left-5">
                     <div className="flex items-end justify-between gap-3">
                       <div>
                         <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-white/85">
                           <MapPin size={14} />
-                          {destination.country}
+                          {destination.slug}
                         </div>
 
                         <h4 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
@@ -336,18 +273,17 @@ const ExploreDestinationsSection = () => {
                 {/* Card content */}
                 <div className="flex flex-1 flex-col p-5 sm:p-6">
                   <p className="flex-1 text-sm leading-7 text-slate-600">
-                    {destination.description}
+                    {destination.description ??
+                      "A beautiful destination waiting to be explored."}
                   </p>
 
                   <div className="mt-5 border-t border-slate-100 pt-4">
                     <Link
-                      href={`/destinations/${encodeURIComponent(
-                        destination.name.toLowerCase().replace(/\s+/g, "-"),
-                      )}`}
+                      href={`/tours?search=${encodeURIComponent(destination.name)}`}
                       className="group/link inline-flex items-center gap-2 text-sm font-bold text-sky-700 transition hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-4"
-                      aria-label={`Explore ${destination.name}, ${destination.country}`}
+                      aria-label={`Explore tours for ${destination.name}`}
                     >
-                      Explore destination
+                      Explore tours here
                       <ArrowRight
                         size={16}
                         className="transition-transform duration-300 group-hover/link:translate-x-1"
@@ -371,7 +307,7 @@ const ExploreDestinationsSection = () => {
 
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
               We couldn&apos;t find a destination matching your search. Try a
-              different name or choose another category.
+              different name or choose another division.
             </p>
 
             <button
@@ -430,4 +366,4 @@ const ExploreDestinationsSection = () => {
   );
 };
 
-export default ExploreDestinationsSection;
+export default ExploreDestinationsClient;

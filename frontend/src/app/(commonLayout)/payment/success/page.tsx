@@ -32,7 +32,7 @@ const PaymentSuccessPage = async ({
 
   if (!payment) {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+      <div className="mx-auto max-w-3xl px-4 py-12 pt-24 sm:px-6 lg:px-8">
         <h1 className="text-xl font-bold text-slate-900">Payment not found</h1>
         <p className="mt-2 text-sm text-slate-600">
           We couldn&apos;t find this payment. Please check your bookings.
