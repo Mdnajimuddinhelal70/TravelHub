@@ -11,12 +11,16 @@ const formatPrice = (price: number) =>
     maximumFractionDigits: 0,
   }).format(price);
 
-const formatDate = (date: string) =>
-  new Intl.DateTimeFormat("en-GB", {
+const formatDate = (date: string | Date | undefined | null): string => {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(d);
+};
 
 const getPaymentStyle = (status: string) => {
   switch (status) {
@@ -36,8 +40,6 @@ const getPaymentStyle = (status: string) => {
 
 const PaymentHistoryPage = async () => {
   const { bookings } = await getMyBookings({ sort: "-createdAt" });
-
-  // Only bookings that have a populated payment object
   const payments = bookings
     .filter(
       (b): b is IBooking & { payment: IPayment } =>
@@ -108,7 +110,8 @@ const PaymentHistoryPage = async () => {
               {payments.map(({ booking, payment }) => (
                 <tr key={payment._id} className="hover:bg-slate-50/50">
                   <td className="px-4 py-3 text-xs text-slate-600">
-                    {formatDate(payment.createdAt)}
+                    {/* ✅ Fallback: payment.createdAt → booking.createdAt */}
+                    {formatDate(payment.createdAt ?? booking.createdAt)}
                   </td>
                   <td className="px-4 py-3 font-mono text-[11px] font-semibold text-sky-700">
                     #{booking.bookingNumber}
