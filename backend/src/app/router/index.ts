@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { AdminRoutes } from "../modules/admin/admin.route";
+import { AiRoutes } from "../modules/ai/ai.route";
 import { AuthRoutes } from "../modules/auth/auth.route";
 import { BookingRoutes } from "../modules/booking/booking.route";
 import { DestinationRoutes } from "../modules/destination/destination.route";
@@ -21,6 +22,7 @@ const moduleRoutes = [
   { path: "/payment", route: PaymentRoutes },
   { path: "/tour-departure", route: TourDepartureRoutes },
   { path: "/admin", route: AdminRoutes },
+  { path: "/ai", route: AiRoutes },
 ];
 
 moduleRoutes.forEach((route) => {

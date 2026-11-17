@@ -54,6 +54,8 @@ interface EnvConfig {
   // REDIS_PORT: string;
   // REDIS_USERNAME: string;
   // REDIS_PASSWORD: string;
+  // AI Related keys
+  GEMINI_API_KEY: string;
 }
 
 const loadEnvVariables = (): EnvConfig => {
@@ -93,6 +95,7 @@ const loadEnvVariables = (): EnvConfig => {
     "EMAIL_HOST",
     "EMAIL_PORT",
     "EMAIL_USER",
+    "GEMINI_API_KEY",
     // "SMTP_PASS",
     // "SMTP_PORT",
     // "SMTP_HOST",
@@ -168,6 +171,7 @@ const loadEnvVariables = (): EnvConfig => {
     //   REDIS_PORT: process.env.REDIS_PORT as string,
     //   REDIS_USERNAME: process.env.REDIS_USERNAME as string,
     //   REDIS_PASSWORD: process.env.REDIS_PASSWORD as string,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
   };
 };
 
