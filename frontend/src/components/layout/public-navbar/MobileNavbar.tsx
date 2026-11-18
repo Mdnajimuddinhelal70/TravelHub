@@ -12,6 +12,7 @@ const navLinks = [
   { label: "Home", href: "/" },
   { label: "Explore Tours", href: "/tours" },
   { label: "Destinations", href: "/destination" },
+  { label: "AI Planner", href: "/ai-planner", isAI: true },
   { label: "About Us", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
@@ -69,7 +70,6 @@ export default function MobileNavbar({
           </button>
         </div>
 
-        {/* ✅ Logged in → User card */}
         {user && (
           <div className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="flex min-w-0 items-center gap-3">

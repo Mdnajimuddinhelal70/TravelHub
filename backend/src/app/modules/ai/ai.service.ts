@@ -5,9 +5,6 @@ import { envVars } from "../../config/env";
 import AppError from "../../errorHelpers/AppError";
 import { IAiTripPlanInput } from "./ai.interface";
 
-/* ============================================================
- *  ZOD SCHEMA
- * ============================================================ */
 const tripPlanSchema = z.object({
   destination: z.string(),
   duration: z.number(),
@@ -24,16 +21,11 @@ const tripPlanSchema = z.object({
   tips: z.array(z.string()),
 });
 
-/* ============================================================
- *  GEMINI SCHEMA HELPER ($ref/$defs flatten)
- * ============================================================ */
 const sanitizeSchemaForGemini = (schema: unknown): unknown => {
   const s = JSON.parse(JSON.stringify(schema));
   if (!s.$defs) return s;
-
   const defs = s.$defs;
   delete s.$defs;
-
   const resolve = (node: any): any => {
     if (Array.isArray(node)) return node.map(resolve);
     if (node && typeof node === "object") {
@@ -42,80 +34,79 @@ const sanitizeSchemaForGemini = (schema: unknown): unknown => {
         return resolve(defs[key]);
       }
       const out: any = {};
-      for (const k of Object.keys(node)) {
-        out[k] = resolve(node[k]);
-      }
+      for (const k of Object.keys(node)) out[k] = resolve(node[k]);
       return out;
     }
     return node;
   };
-
   return resolve(s);
 };
 
-/* ============================================================
- *  AI CLIENT
- * ============================================================ */
 const ai = new GoogleGenAI({ apiKey: envVars.GEMINI_API_KEY });
 
-/* ============================================================
- *  HELPERS — Sleep
- * ============================================================ */
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const generateFast = async (prompt: string): Promise<any> => {
+  const schema = sanitizeSchemaForGemini(z.toJSONSchema(tripPlanSchema));
 
-/* ============================================================
- *  RETRY LOGIC — Try multiple models + retries
- * ============================================================ */
-const MODEL_PRIORITY = [
-  "gemini-3.8-flash",
-  "gemini-3.5-flash",
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-];
+  try {
+    console.log("[AI] Trying gemini-3.8-flash (thinking: low)...");
+    const interaction = await ai.interactions.create({
+      model: "gemini-3.8-flash",
+      input: prompt,
+      generation_config: {
+        thinking_level: "low",
+      },
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema,
+      },
+    });
+    console.log("[AI] ✅ Success with 3.8-flash");
+    return interaction;
+  } catch (error: any) {
+    const status = error?.status ?? error?.statusCode;
+    console.error(`[AI] 3.8-flash failed: ${status} — ${error?.message}`);
 
-const generateWithRetry = async (prompt: string): Promise<any> => {
-  let lastError: any;
-
-  for (const model of MODEL_PRIORITY) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        console.log(`[AI] Trying model: ${model} (attempt ${attempt}/2)...`);
-
-        const interaction = await ai.interactions.create({
-          model,
-          input: prompt,
-          response_format: {
-            type: "text",
-            mime_type: "application/json",
-            schema: sanitizeSchemaForGemini(z.toJSONSchema(tripPlanSchema)),
-          },
-        });
-
-        console.log(`[AI] ✅ Success with model: ${model}`);
-        return interaction;
-      } catch (error: any) {
-        lastError = error;
-        const status = error?.status ?? error?.statusCode;
-        const msg = error?.message ?? "Unknown";
-
-        console.error(
-          `[AI] ❌ ${model} attempt ${attempt} failed: ${status} — ${msg}`,
-        );
-        if (status === 404) {
-          break;
-        }
-        if ((status === 503 || status === 429) && attempt < 2) {
-          const waitMs = attempt * 3000; // 3s
-          console.log(`[AI] Waiting ${waitMs}ms before retry...`);
-          await sleep(waitMs);
-          continue;
-        }
-        break;
-      }
+    if (status === 404 || status === 503) {
+      console.log("[AI] Falling back to gemini-2.0-flash...");
+      const interaction = await ai.interactions.create({
+        model: "gemini-2.0-flash",
+        input: prompt,
+        generation_config: {
+          thinking_level: "low",
+        },
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema,
+        },
+      });
+      console.log("[AI] ✅ Success with 2.0-flash");
+      return interaction;
     }
-  }
+    if (status === 429) {
+      console.log("[AI] Rate limited. Waiting 2s...");
+      await new Promise((r) => setTimeout(r, 2000));
+      const interaction = await ai.interactions.create({
+        model: "gemini-3.8-flash",
+        input: prompt,
+        generation_config: { thinking_level: "low" },
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema,
+        },
+      });
+      return interaction;
+    }
 
-  throw lastError;
+    throw new AppError(
+      httpStatus.BAD_GATEWAY,
+      error?.message?.includes("high demand")
+        ? "AI model is busy. Please try again in a few minutes."
+        : "AI daily limit reached. Please try again tomorrow.",
+    );
+  }
 };
 
 export const AiServices = {
@@ -145,16 +136,19 @@ Return a JSON object with EXACTLY this structure:
 Make it realistic for Bangladesh travel. Use BDT currency.`;
 
     try {
-      const interaction = await generateWithRetry(prompt);
-
+      const interaction = await generateFast(prompt);
       const text = interaction.output_text ?? "{}";
       const parsed = tripPlanSchema.parse(JSON.parse(text));
-
       return parsed;
     } catch (error: any) {
+      console.error("=== GEMINI FINAL ERROR ===");
+      console.error("Message:", error?.message);
+      console.error("Status:", error?.status);
+      console.error("=========================");
+
       throw new AppError(
         httpStatus.BAD_GATEWAY,
-        "AI service is currently busy. Please try again in a few moments.",
+        "AI service is currently busy. Please try again in a moment.",
       );
     }
   },

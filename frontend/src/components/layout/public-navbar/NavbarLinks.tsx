@@ -1,5 +1,6 @@
 "use client";
 
+import { Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -18,6 +19,8 @@ export default function NavbarLinks() {
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(`${href}/`);
   };
+
+  const isAIActive = isActive("/ai-planner");
 
   return (
     <nav
@@ -46,6 +49,23 @@ export default function NavbarLinks() {
           </Link>
         );
       })}
+
+      {/* ✨ AI Planner — Highlighted Button */}
+      <Link
+        href="/ai-planner"
+        aria-current={isAIActive ? "page" : undefined}
+        className={`group relative ml-2 inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-300 ${
+          isAIActive
+            ? "bg-gradient-to-r from-sky-400 via-cyan-400 to-indigo-500 shadow-lg shadow-violet-500/30"
+            : "bg-gradient-to-r from-sky-400 via-cyan-400 to-indigo-500 shadow-md shadow-violet-500/25 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/30"
+        }`}
+      >
+        <Sparkles className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" />
+        <span>AI Planner</span>
+        <span className="ml-0.5 rounded-full bg-white/25 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider">
+          New
+        </span>
+      </Link>
     </nav>
   );
 }
