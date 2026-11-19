@@ -11,6 +11,7 @@
         "clsx": "^2.1.1",
         "jose": "^6.2.13",
         "jsonwebtoken": "^9.0.3",
+        "lenis": "^1.3.27",
         "lucide-react": "^1.14.0",
         "motion": "^12.38.0",
         "next": "16.2.4",
@@ -1042,6 +1043,8 @@
     "language-subtag-registry": ["language-subtag-registry@0.3.23", "", {}, ""],
 
     "language-tags": ["language-tags@1.0.9", "", { "dependencies": { "language-subtag-registry": "^0.3.20" } }, ""],
+
+    "lenis": ["lenis@1.3.27", "", { "peerDependencies": { "@nuxt/kit": ">=3.0.0", "react": ">=17.0.0", "vue": ">=3.0.0" }, "optionalPeers": ["@nuxt/kit", "react", "vue"] }, "sha512-QIHNH4LIfWyLfgH/5K0aTGZgyFJJ7GfHNcaH/AIgyKjb8gstLh5siNGvrVqz1w5ClLXzOvllBVk7vby8JzUVPQ=="],
 
     "levn": ["levn@0.4.1", "", { "dependencies": { "prelude-ls": "^1.2.1", "type-check": "~0.4.0" } }, ""],
 
