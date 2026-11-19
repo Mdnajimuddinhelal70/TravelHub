@@ -35,8 +35,6 @@ const credentialsLogin = catchAsync(
       }
 
       const userTokens = createUserTokens(user);
-
-      // Refresh token DB-তে save করো
       await User.findByIdAndUpdate(user._id, {
         refreshToken: userTokens.refreshToken,
       });
@@ -175,33 +173,28 @@ const forgotPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const googleCallbackController = catchAsync(
-  async (req: Request, res: Response) => {
-    const state = req.query.state as string | undefined;
-    let redirectTo = "/";
+const googleCallbackController = catchAsync(async (req, res) => {
+  const redirectQuery = req.query.state as string | undefined;
+  let redirectTo = "/dashboard";
 
-    // Open redirect protection: শুধু safe relative path allow
-    if (state && /^\/[a-zA-Z0-9\-_/]*$/.test(state)) {
-      redirectTo = state;
-    }
+  if (redirectQuery && /^\/[a-zA-Z0-9\-_/]*$/.test(redirectQuery)) {
+    redirectTo = redirectQuery;
+  }
+  const user = req.user as any;
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User Not Found");
+  }
 
-    const user = req.user as any;
+  const tokenInfo = createUserTokens(user);
+  await User.findByIdAndUpdate(user._id, {
+    refreshToken: tokenInfo.refreshToken,
+  });
+  setAuthCookie(res, tokenInfo);
 
-    if (!user) {
-      throw new AppError(httpStatus.NOT_FOUND, "User Not Found");
-    }
-
-    const tokenInfo = createUserTokens(user);
-
-    await User.findByIdAndUpdate(user._id, {
-      refreshToken: tokenInfo.refreshToken,
-    });
-
-    setAuthCookie(res, tokenInfo);
-
-    res.redirect(`${envVars.FRONTEND_URL}${redirectTo}`);
-  },
-);
+  res.redirect(
+    `${envVars.FRONTEND_URL}/auth/google/callback?redirect=${encodeURIComponent(redirectTo)}`,
+  );
+});
 
 export const AuthControllers = {
   credentialsLogin,

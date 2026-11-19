@@ -18,7 +18,7 @@ import {
 const router = Router();
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 10,
   message: "Too many attempts, please try again later",
   standardHeaders: true,
@@ -66,10 +66,10 @@ router.post(
 router.get(
   "/google",
   async (req: Request, res: Response, next: NextFunction) => {
-    const redirect = req.query.redirect || "/";
+    const redirect = req.query.redirect || "/dashboard"; // ✅ redirect query
     passport.authenticate("google", {
       scope: ["profile", "email"],
-      state: redirect as string,
+      state: redirect as string, // state-এ redirect
     })(req, res, next);
   },
 );
