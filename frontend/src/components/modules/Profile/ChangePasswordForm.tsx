@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import PasswordRequirements from "@/components/shared/PasswordRequirements";
 import { changePassword } from "@/services/auth/changePassword";
 
 const ChangePasswordForm = () => {
@@ -34,7 +35,6 @@ const ChangePasswordForm = () => {
 
       if (result.success) {
         toast.success(result.message);
-        // Backend invalidates refresh token on password change — force re-login
         router.push("/login");
       } else {
         toast.error(result.message);
@@ -46,36 +46,48 @@ const ChangePasswordForm = () => {
     <form onSubmit={handleSubmit} className="space-y-4">
       {(["oldPassword", "newPassword", "confirmPassword"] as const).map(
         (key) => (
-          <label key={key} className="block">
-            <span className="mb-1.5 block text-xs font-bold text-slate-700">
-              {key === "oldPassword"
-                ? "Current password"
-                : key === "newPassword"
-                  ? "New password"
-                  : "Confirm new password"}
-            </span>
-            <div className="relative">
-              <input
-                type={show ? "text" : "password"}
-                value={form[key]}
-                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                required
-                minLength={key === "oldPassword" ? 1 : 8}
-                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-              />
-              {key === "newPassword" && (
-                <button
-                  type="button"
-                  onClick={() => setShow((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                  aria-label={show ? "Hide password" : "Show password"}
-                >
-                  {show ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              )}
-            </div>
-          </label>
+          <div key={key} className="block">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">
+                {key === "oldPassword"
+                  ? "Current password"
+                  : key === "newPassword"
+                    ? "New password"
+                    : "Confirm new password"}
+              </span>
+              <div className="relative">
+                <input
+                  type={show ? "text" : "password"}
+                  value={form[key]}
+                  onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                  required
+                  minLength={key === "oldPassword" ? 1 : 8}
+                  className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                />
+                {key === "newPassword" && (
+                  <button
+                    type="button"
+                    onClick={() => setShow((s) => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                    aria-label={show ? "Hide password" : "Show password"}
+                  >
+                    {show ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                )}
+              </div>
+            </label>
+
+            {key === "newPassword" && (
+              <PasswordRequirements password={form.newPassword} />
+            )}
+          </div>
         ),
+      )}
+
+      {form.confirmPassword && form.newPassword !== form.confirmPassword && (
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700">
+          Passwords do not match
+        </p>
       )}
 
       <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700">

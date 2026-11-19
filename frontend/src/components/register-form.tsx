@@ -5,7 +5,9 @@ import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
+
 import InputFieldError from "./shared/InputFieldError";
+import PasswordRequirements from "./shared/PasswordRequirements";
 import { Button } from "./ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
@@ -13,6 +15,7 @@ import { Input } from "./ui/input";
 const RegisterForm = () => {
   const [state, formAction, isPending] = useActionState(registerUser, null);
   const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     if (state?.success) {
@@ -81,8 +84,8 @@ const RegisterForm = () => {
             <InputFieldError field="email" state={state} />
           </Field>
 
-          {/* Password with Show/Hide Toggle */}
-          <Field>
+          {/* Password with Show/Hide + Requirements */}
+          <Field className="md:col-span-2">
             <FieldLabel htmlFor="password">Password</FieldLabel>
 
             <div className="relative">
@@ -90,11 +93,13 @@ const RegisterForm = () => {
                 id="password"
                 name="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder="Create a strong password"
                 autoComplete="new-password"
                 required
                 minLength={8}
                 className="pr-10"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
 
               <button
@@ -108,11 +113,12 @@ const RegisterForm = () => {
               </button>
             </div>
 
+            <PasswordRequirements password={password} />
+
             <InputFieldError field="password" state={state} />
           </Field>
         </div>
 
-        {/* Submit */}
         <FieldGroup className="mt-4">
           <Field>
             <Button type="submit" disabled={isPending}>
