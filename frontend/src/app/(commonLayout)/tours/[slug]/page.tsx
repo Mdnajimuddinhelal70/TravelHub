@@ -37,7 +37,7 @@ const getCoverImage = (tour: ITour): string =>
   tour.images?.[0] ||
   "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=85";
 
-const getDestinationName = async (tour: ITour): Promise<string> => {
+const getDestinationName = (tour: ITour): string => {
   if (tour.primaryDestination && typeof tour.primaryDestination !== "string") {
     return tour.primaryDestination.name;
   }
@@ -58,9 +58,12 @@ const TourDetailPage = async ({
 }: {
   params: Promise<{ slug: string }>;
 }) => {
-  const user = await getMe();
-  const canBook = user?.role === "USER" || user?.role === "GUIDE";
   const { slug } = await params;
+
+  const user = await getMe();
+  const isGuest = !user;
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const canBook = user?.role === "USER" || user?.role === "GUIDE";
 
   const tour = await getTourBySlug(slug);
   if (!tour) notFound();
@@ -324,19 +327,38 @@ const TourDetailPage = async ({
                       {d.availableSeats} seat
                       {d.availableSeats !== 1 ? "s" : ""} left
                     </p>
-                    {canBook ? (
+
+                    {/* ✅ Logged-in USER / GUIDE → Book Now */}
+                    {canBook && (
                       <Link
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-sky-500 to-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-green-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:from-sky-600 hover:to-sky-700 hover:shadow-lg hover:shadow-green-500/30 active:scale-95"
                         href={`/tours/${tour.slug}/book?departure=${d._id}`}
+                        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-sky-500 to-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:from-sky-600 hover:to-sky-700 hover:shadow-lg hover:shadow-sky-500/30 active:scale-95"
                       >
                         Book Now
-                        <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                        <ArrowRight className="h-4 w-4" />
                       </Link>
-                    ) : (
-                      <p className="text-xs text-amber-700">
-                        Admins cannot book tours. Please login as a regular
-                        user.
-                      </p>
+                    )}
+
+                    {/* ✅ Guest → Login to Book with redirect */}
+                    {isGuest && (
+                      <Link
+                        href={`/login?redirect=${encodeURIComponent(
+                          `/tours/${tour.slug}/book?departure=${d._id}`,
+                        )}`}
+                        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-sky-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+                      >
+                        Login to Book
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    )}
+
+                    {isAdmin && (
+                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+                        <p className="text-center text-[11px] font-semibold text-amber-800">
+                          Admins cannot book tours. Please log in with a regular
+                          user account.
+                        </p>
+                      </div>
                     )}
                   </li>
                 ))}

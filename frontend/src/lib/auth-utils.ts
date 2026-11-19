@@ -96,7 +96,6 @@ export const isValidRedirectForRole = (
   redirectPath: string,
   role: UserRole,
 ): boolean => {
-  // Allow only safe, local paths.
   if (
     !redirectPath.startsWith("/") ||
     redirectPath.startsWith("//") ||
@@ -105,30 +104,24 @@ export const isValidRedirectForRole = (
     return false;
   }
 
-  // Allow the public homepage.
-  if (redirectPath === "/") {
-    return true;
-  }
+  if (redirectPath === "/") return true;
 
-  // Authentication pages are not valid post-login destinations.
-  if (isAuthRoute(redirectPath)) {
-    return false;
-  }
+  if (isAuthRoute(redirectPath)) return false;
 
   const routeOwner = getRouteOwner(redirectPath);
 
   if (routeOwner === null) {
-    return false;
+    return (
+      redirectPath.startsWith("/tours") ||
+      redirectPath.startsWith("/destination") ||
+      redirectPath.startsWith("/about") ||
+      redirectPath.startsWith("/contact")
+    );
   }
 
-  if (routeOwner === "COMMON") {
-    return true;
-  }
+  if (routeOwner === "COMMON") return true;
 
-  // Super Admin can also access Admin management routes.
-  if (role === "SUPER_ADMIN" && routeOwner === "ADMIN") {
-    return true;
-  }
+  if (role === "SUPER_ADMIN" && routeOwner === "ADMIN") return true;
 
   return routeOwner === role;
 };
