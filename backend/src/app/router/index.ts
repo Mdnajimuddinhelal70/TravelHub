@@ -3,6 +3,8 @@ import { AdminRoutes } from "../modules/admin/admin.route";
 import { AiRoutes } from "../modules/ai/ai.route";
 import { AuthRoutes } from "../modules/auth/auth.route";
 import { BookingRoutes } from "../modules/booking/booking.route";
+
+import { ContactRoute } from "../modules/contact/contact.route";
 import { DestinationRoutes } from "../modules/destination/destination.route";
 import { DivisionRoutes } from "../modules/division/division.route";
 import { PaymentRoutes } from "../modules/payment/payment.route";
@@ -23,6 +25,7 @@ const moduleRoutes = [
   { path: "/tour-departure", route: TourDepartureRoutes },
   { path: "/admin", route: AdminRoutes },
   { path: "/ai", route: AiRoutes },
+  { path: "/contact", route: ContactRoute },
 ];
 
 moduleRoutes.forEach((route) => {

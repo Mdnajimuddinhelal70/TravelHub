@@ -43,19 +43,9 @@ interface EnvConfig {
   EMAIL_HOST: string;
   EMAIL_PORT: string;
   EMAIL_USER: string;
-  // EMAIL_SENDER: {
-  //   SMTP_USER: string;
-  //   SMTP_PASS: string;
-  //   SMTP_PORT: string;
-  //   SMTP_HOST: string;
-  //   SMTP_FROM: string;
-  // };
-  // REDIS_HOST: string;
-  // REDIS_PORT: string;
-  // REDIS_USERNAME: string;
-  // REDIS_PASSWORD: string;
-  // AI Related keys
   GEMINI_API_KEY: string;
+  RESEND_API_KEY: string;
+  EMAIL_SENDER_EMAIL: string;
 }
 
 const loadEnvVariables = (): EnvConfig => {
@@ -85,40 +75,39 @@ const loadEnvVariables = (): EnvConfig => {
     "SSL_SUCCESS_BACKEND_URL",
     "SSL_FAIL_BACKEND_URL",
     "SSL_CANCEL_BACKEND_URL",
+    "SSL_IPN_URL",
     "CLOUDINARY_CLOUD_NAME",
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
     "JWT_RESET_PASSWORD_SECRET",
     "JWT_RESET_PASSWORD_EXPIRES",
+    "EMAIL_USER",
+    "GEMINI_API_KEY",
+    "RESEND_API_KEY",
+    "EMAIL_SENDER_EMAIL",
     "EMAIL_SENDER",
     "EMAIL_PASS",
     "EMAIL_HOST",
     "EMAIL_PORT",
-    "EMAIL_USER",
-    "GEMINI_API_KEY",
-    // "SMTP_PASS",
-    // "SMTP_PORT",
-    // "SMTP_HOST",
-    // "SMTP_USER",
-    // "SMTP_FROM",
-    // "REDIS_HOST",
-    // "REDIS_PORT",
-    // "REDIS_USERNAME",
-    // "REDIS_PASSWORD",
-    // "SSL_IPN_URL",
   ];
 
   requiredEnvVariables.forEach((key) => {
     if (!process.env[key]) {
-      throw new Error(`Missing require environment variabl ${key}`);
+      throw new Error(`❌ Missing required environment variable: ${key}`);
     }
   });
 
+  const nodeEnv = process.env.NODE_ENV;
+  if (nodeEnv !== "development" && nodeEnv !== "production") {
+    throw new Error(
+      `❌ NODE_ENV must be "development" or "production", got: ${nodeEnv}`,
+    );
+  }
+
   return {
     PORT: process.env.PORT as string,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    DB_URL: process.env.DB_URL!,
-    NODE_ENV: process.env.NODE_ENV as "development" | "production",
+    DB_URL: process.env.DB_URL as string,
+    NODE_ENV: nodeEnv,
     BCRYPT_SALT_ROUND: process.env.BCRYPT_SALT_ROUND as string,
     JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET as string,
     JWT_ACCESS_EXPIRES: process.env.JWT_ACCESS_EXPIRES as string,
@@ -134,7 +123,6 @@ const loadEnvVariables = (): EnvConfig => {
     GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL as string,
     EXPRESS_SESSION_SECRET: process.env.EXPRESS_SESSION_SECRET as string,
     FRONTEND_URL: process.env.FRONTEND_URL as string,
-    // ssl
     SSL: {
       STORE_ID: process.env.SSL_STORE_ID as string,
       STORE_PASS: process.env.SSL_STORE_PASS as string,
@@ -153,25 +141,14 @@ const loadEnvVariables = (): EnvConfig => {
       CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY as string,
       CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET as string,
     },
-
     EMAIL_SENDER: process.env.EMAIL_SENDER as string,
     EMAIL_PASS: process.env.EMAIL_PASS as string,
     EMAIL_HOST: process.env.EMAIL_HOST as string,
     EMAIL_PORT: process.env.EMAIL_PORT as string,
     EMAIL_USER: process.env.EMAIL_USER as string,
-
-    //   EMAIL_SENDER: {
-    //     SMTP_USER: process.env.SMTP_USER as string,
-    //     SMTP_PASS: process.env.SMTP_PASS as string,
-    //     SMTP_PORT: process.env.SMTP_PORT as string,
-    //     SMTP_HOST: process.env.SMTP_HOST as string,
-    //     SMTP_FROM: process.env.SMTP_FROM as string,
-    //   },
-    //   REDIS_HOST: process.env.REDIS_HOST as string,
-    //   REDIS_PORT: process.env.REDIS_PORT as string,
-    //   REDIS_USERNAME: process.env.REDIS_USERNAME as string,
-    //   REDIS_PASSWORD: process.env.REDIS_PASSWORD as string,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY as string,
+    RESEND_API_KEY: process.env.RESEND_API_KEY as string,
+    EMAIL_SENDER_EMAIL: process.env.EMAIL_SENDER_EMAIL as string,
   };
 };
 

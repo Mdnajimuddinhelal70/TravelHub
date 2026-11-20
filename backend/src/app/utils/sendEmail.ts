@@ -1,93 +1,65 @@
 import ejs from "ejs";
-import fs from "fs";
-import httpStatus from "http-status-codes";
-import nodemailer from "nodemailer";
 import path from "path";
+import { Resend } from "resend";
 import { envVars } from "../config/env";
-import AppError from "../errorHelpers/AppError";
 
-const transporter = nodemailer.createTransport({
-  host: envVars.EMAIL_HOST,
-  port: Number(envVars.EMAIL_PORT),
-  // port 465 → secure: true, port 587/2525 → secure: false
-  secure: Number(envVars.EMAIL_PORT) === 465,
-  auth: {
-    user: envVars.EMAIL_USER,
-    pass: envVars.EMAIL_PASS,
-  },
-});
+// ✅ Env validation — startup-এই fail করো, silent fail না
+if (!envVars.RESEND_API_KEY) {
+  throw new Error("❌ RESEND_API_KEY is missing in .env");
+}
+if (!envVars.EMAIL_SENDER_EMAIL) {
+  throw new Error("❌ EMAIL_SENDER_EMAIL is missing in .env");
+}
 
-// Startup-এ connection verify করো
-transporter.verify((error) => {
-  if (error) {
-    console.error("❌ Email transporter verification failed:", error.message);
-  } else {
-    console.log("✅ Email transporter is ready");
-  }
-});
+const resend = new Resend(envVars.RESEND_API_KEY);
 
 interface SendEmailOptions {
-  to: string;
+  to: string | string[];
   subject: string;
   templateName: string;
-  templateData?: Record<string, any>;
+  templateData: Record<string, unknown>;
+  replyTo?: string;
   attachments?: {
     filename: string;
     content: Buffer | string;
-    contentType: string;
+    contentType?: string;
   }[];
 }
 
-export const sendEmail = async ({
-  to,
-  subject,
-  templateName,
-  templateData,
-  attachments,
-}: SendEmailOptions) => {
+export const sendEmail = async (options: SendEmailOptions) => {
   try {
+    // ✅ Template path — dev & prod দুটোতেই কাজ করবে
+    // (prod-এ .ejs ফাইলগুলো dist/app/templates-এ copy করতে হবে)
     const templatePath = path.join(
-      __dirname,
-      "..",
-      "templates",
-      `${templateName}.ejs`,
+      process.cwd(),
+      "src/app/templates",
+      `${options.templateName}.ejs`,
     );
-    if (!fs.existsSync(templatePath)) {
-      throw new AppError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        `Email template not found: ${templateName}.ejs`,
-      );
-    }
 
-    const html = await ejs.renderFile(templatePath, templateData ?? {});
+    const html = await ejs.renderFile(templatePath, options.templateData);
 
-    const info = await transporter.sendMail({
-      from: `"Travel Hub" <${envVars.EMAIL_SENDER}>`,
-      to,
-      subject,
+    const { data, error } = await resend.emails.send({
+      from: `Travel Hub <${envVars.EMAIL_SENDER_EMAIL}>`,
+      to: options.to,
+      subject: options.subject,
       html,
-      attachments: attachments?.map((attachment) => ({
-        filename: attachment.filename,
-        content: attachment.content,
-        contentType: attachment.contentType,
+      replyTo: options.replyTo,
+      attachments: options.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
       })),
     });
 
-    console.log(`✉️ Email sent to ${to}: ${info.messageId}`);
-    return info;
-  } catch (error: unknown) {
-    if (error instanceof AppError) {
-      throw error;
+    if (error) {
+      console.error("❌ Resend error:", error);
+      throw new Error(error.message);
     }
 
-    const message =
-      error instanceof Error ? error.message : "Unknown email error";
-
-    console.error("❌ sendEmail failed:", message);
-
-    throw new AppError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      `Email error: ${message}`,
-    );
+    console.log("✅ Email sent:", data?.id);
+    return data;
+  } catch (error) {
+    console.error("❌ Email send failed:", error);
+    throw error;
   }
 };

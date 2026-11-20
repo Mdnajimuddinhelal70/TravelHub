@@ -1,6 +1,12 @@
+"use client";
+
+import { sendContactMessage } from "@/services/contact/contact.service";
 import {
+  AlertCircle,
   ArrowUpRight,
+  CheckCircle2,
   Clock3,
+  Loader2,
   Mail,
   MapPin,
   MessageCircle,
@@ -10,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import { FormEvent, useState } from "react";
 
 const contactMethods = [
   {
@@ -38,7 +45,58 @@ const contactMethods = [
   },
 ];
 
+const initialFormData = {
+  name: "",
+  email: "",
+  subject: "",
+  message: "",
+};
+
 const ContactFormSection = () => {
+  const [formData, setFormData] = useState(initialFormData);
+  const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<string[]>([]);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    setIsLoading(true);
+    setSuccessMessage("");
+    setErrorMessage("");
+    setFieldErrors([]);
+
+    try {
+      const result = await sendContactMessage(formData);
+
+      if (result.success) {
+        setSuccessMessage(
+          "Your message has been sent successfully! We'll get back to you soon.",
+        );
+        setFormData(initialFormData);
+      } else {
+        setErrorMessage(
+          result.message || result.error || "Failed to send message.",
+        );
+        if (result.errors?.length) setFieldErrors(result.errors);
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(
+        "Network error. Please check your connection and try again.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <section
       id="contact-details"
@@ -180,10 +238,45 @@ const ContactFormSection = () => {
               </p>
             </div>
 
+            {/* Success banner */}
+            {successMessage && (
+              <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <CheckCircle2
+                  size={20}
+                  className="mt-0.5 shrink-0 text-emerald-600"
+                />
+                <p className="text-sm font-medium leading-6 text-emerald-800">
+                  {successMessage}
+                </p>
+              </div>
+            )}
+
+            {/* Error banner */}
+            {errorMessage && (
+              <div className="mb-6 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <AlertCircle
+                  size={20}
+                  className="mt-0.5 shrink-0 text-rose-600"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium leading-6 text-rose-800">
+                    {errorMessage}
+                  </p>
+                  {fieldErrors.length > 0 && (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-rose-700">
+                      {fieldErrors.map((err, i) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+
             <form
               id="contact-form"
-              action="#contact-form"
-              method="get"
+              onSubmit={handleSubmit}
+              noValidate
               className="space-y-5"
             >
               <div className="grid gap-5 sm:grid-cols-2">
@@ -201,7 +294,10 @@ const ContactFormSection = () => {
                     autoComplete="name"
                     placeholder="Your full name"
                     required
-                    className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+                    value={formData.name}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                    className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
 
@@ -219,7 +315,10 @@ const ContactFormSection = () => {
                     autoComplete="email"
                     placeholder="you@example.com"
                     required
-                    className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+                    value={formData.email}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                    className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -237,7 +336,10 @@ const ContactFormSection = () => {
                   type="text"
                   placeholder="What would you like to discuss?"
                   required
-                  className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+                  value={formData.subject}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
 
@@ -255,7 +357,10 @@ const ContactFormSection = () => {
                   minLength={10}
                   placeholder="Tell us a little about how we can help..."
                   required
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+                  value={formData.message}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <p className="mt-2 text-xs text-slate-400">
                   Please enter at least 10 characters.
@@ -264,13 +369,23 @@ const ContactFormSection = () => {
 
               <button
                 type="submit"
-                className="group flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 via-cyan-600 to-blue-600 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-sky-600/20 transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-sky-600/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300"
+                disabled={isLoading}
+                className="group flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 via-cyan-600 to-blue-600 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-sky-600/20 transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-sky-600/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
               >
-                Send Message
-                <Send
-                  size={17}
-                  className="transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-0.5"
-                />
+                {isLoading ? (
+                  <>
+                    Sending...
+                    <Loader2 size={17} className="animate-spin" />
+                  </>
+                ) : (
+                  <>
+                    Send Message
+                    <Send
+                      size={17}
+                      className="transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-0.5"
+                    />
+                  </>
+                )}
               </button>
 
               <div className="flex items-start justify-center gap-2 text-center">
@@ -279,8 +394,8 @@ const ContactFormSection = () => {
                   className="mt-0.5 shrink-0 text-emerald-600"
                 />
                 <p className="text-xs leading-5 text-slate-500">
-                  Your information should be handled securely when the form
-                  submission service is connected.
+                  Your information is handled securely. We never share your
+                  details with third parties.
                 </p>
               </div>
             </form>
